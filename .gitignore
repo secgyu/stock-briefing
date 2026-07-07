@@ -13,6 +13,9 @@ build/
 .granite/
 .ait/
 
+# Cloudflare Wrangler 로컬 캐시
+.wrangler/
+
 # Env & secrets
 .env
 .env.*

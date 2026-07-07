@@ -12,73 +12,82 @@ function hoursAgo(h: number, base: Date = new Date()): string {
   return new Date(base.getTime() - h * 3_600_000).toISOString();
 }
 
-export const MOCK_EARNINGS: EarningsEvent[] = [
-  {
-    symbol: "AAPL",
-    name: "애플",
-    market: "US",
-    date: dayOffset(3),
-    time: "AMC",
-    isEstimated: false,
-    quarter: "2026 Q3",
-  },
-  {
-    symbol: "TSLA",
-    name: "테슬라",
-    market: "US",
-    date: dayOffset(7),
-    time: "AMC",
-    isEstimated: false,
-    quarter: "2026 Q2",
-  },
-  {
-    symbol: "JNJ",
-    name: "존슨앤존슨",
-    market: "US",
-    date: dayOffset(9),
-    time: "BMO",
-    isEstimated: false,
-    quarter: "2026 Q2",
-  },
-  {
-    symbol: "MSFT",
-    name: "마이크로소프트",
-    market: "US",
-    date: dayOffset(4),
-    time: "AMC",
-    isEstimated: false,
-    quarter: "2026 Q4",
-  },
-  {
-    symbol: "KO",
-    name: "코카콜라",
-    market: "US",
-    date: dayOffset(15),
-    time: "BMO",
-    isEstimated: false,
-    quarter: "2026 Q2",
-  },
-  {
-    symbol: "NVDA",
-    name: "엔비디아",
-    market: "US",
-    date: dayOffset(45),
-    time: "AMC",
-    isEstimated: false,
-    quarter: "2027 Q2",
-  },
-  { symbol: "005930", name: "삼성전자", market: "KR", date: dayOffset(22), isEstimated: true, quarter: "2026 Q2" },
-  { symbol: "000660", name: "SK하이닉스", market: "KR", date: dayOffset(18), isEstimated: true, quarter: "2026 Q2" },
-  { symbol: "035420", name: "NAVER", market: "KR", date: dayOffset(30), isEstimated: true, quarter: "2026 Q2" },
-  { symbol: "035720", name: "카카오", market: "KR", date: dayOffset(2), isEstimated: true, quarter: "2026 Q2" },
-];
+// Cloudflare Workers는 모듈 로드 시 new Date()가 epoch(0)을 반환한다.
+// 그래서 상대 날짜 mock은 반드시 "요청 시점"에 호출되는 builder로 만들고,
+// 프론트(브라우저)는 아래 eager 상수를 그대로 쓴다. Worker는 builder를 호출한다.
+export function buildEarnings(): EarningsEvent[] {
+  return [
+    {
+      symbol: "AAPL",
+      name: "애플",
+      market: "US",
+      date: dayOffset(3),
+      time: "AMC",
+      isEstimated: false,
+      quarter: "2026 Q3",
+    },
+    {
+      symbol: "TSLA",
+      name: "테슬라",
+      market: "US",
+      date: dayOffset(7),
+      time: "AMC",
+      isEstimated: false,
+      quarter: "2026 Q2",
+    },
+    {
+      symbol: "JNJ",
+      name: "존슨앤존슨",
+      market: "US",
+      date: dayOffset(9),
+      time: "BMO",
+      isEstimated: false,
+      quarter: "2026 Q2",
+    },
+    {
+      symbol: "MSFT",
+      name: "마이크로소프트",
+      market: "US",
+      date: dayOffset(4),
+      time: "AMC",
+      isEstimated: false,
+      quarter: "2026 Q4",
+    },
+    {
+      symbol: "KO",
+      name: "코카콜라",
+      market: "US",
+      date: dayOffset(15),
+      time: "BMO",
+      isEstimated: false,
+      quarter: "2026 Q2",
+    },
+    {
+      symbol: "NVDA",
+      name: "엔비디아",
+      market: "US",
+      date: dayOffset(45),
+      time: "AMC",
+      isEstimated: false,
+      quarter: "2027 Q2",
+    },
+    { symbol: "005930", name: "삼성전자", market: "KR", date: dayOffset(22), isEstimated: true, quarter: "2026 Q2" },
+    { symbol: "000660", name: "SK하이닉스", market: "KR", date: dayOffset(18), isEstimated: true, quarter: "2026 Q2" },
+    { symbol: "035420", name: "NAVER", market: "KR", date: dayOffset(30), isEstimated: true, quarter: "2026 Q2" },
+    { symbol: "035720", name: "카카오", market: "KR", date: dayOffset(2), isEstimated: true, quarter: "2026 Q2" },
+  ];
+}
+export const MOCK_EARNINGS: EarningsEvent[] = buildEarnings();
 
-export const MOCK_IPOS: IpoEvent[] = [
-  { symbol: undefined, name: "레몬헬스케어", market: "KR", date: dayOffset(0), isEstimated: false },
-  { symbol: undefined, name: "뷰티테크", market: "KR", date: dayOffset(2), isEstimated: true },
-  { symbol: "FIG", name: "Figma", market: "US", date: dayOffset(4), isEstimated: false },
-  { symbol: "DBX2", name: "Databricks", market: "US", date: dayOffset(9), isEstimated: false },
-];
+export function buildIpos(): IpoEvent[] {
+  return [
+    { symbol: undefined, name: "레몬헬스케어", market: "KR", date: dayOffset(0), isEstimated: false },
+    { symbol: undefined, name: "뷰티테크", market: "KR", date: dayOffset(2), isEstimated: true },
+    { symbol: "FIG", name: "Figma", market: "US", date: dayOffset(4), isEstimated: false },
+    { symbol: "DBX2", name: "Databricks", market: "US", date: dayOffset(9), isEstimated: false },
+  ];
+}
+export const MOCK_IPOS: IpoEvent[] = buildIpos();
 
 export const MOCK_SECTORS: SectorRank[] = [
   { rank: 1, name: "조선", market: "KR", weeklyChangePct: 5.1 },
@@ -90,77 +99,82 @@ export const MOCK_SECTORS: SectorRank[] = [
   { rank: 7, name: "Energy", market: "US", weeklyChangePct: -2.4 },
 ];
 
-export const MOCK_MARKET_NEWS: NewsItem[] = [
-  {
-    title: "코스피, 외국인 매수세에 2년 만에 최고치 경신",
-    source: "연합뉴스",
-    publishedAt: hoursAgo(1),
-    url: "https://example.com/news/1",
-  },
-  {
-    title: "미 연준, 금리 동결 시사… 기술주 강세",
-    source: "한국경제",
-    publishedAt: hoursAgo(3),
-    url: "https://example.com/news/2",
-  },
-  {
-    title: "반도체 업황 회복 신호… 수출 지표 개선",
-    source: "매일경제",
-    publishedAt: hoursAgo(5),
-    url: "https://example.com/news/3",
-  },
-  {
-    title: "국내 IPO 시장 활기… 하반기 대어 줄줄이 대기",
-    source: "이데일리",
-    publishedAt: hoursAgo(8),
-    url: "https://example.com/news/4",
-  },
-  {
-    title: "이번 주 실적 발표 앞둔 빅테크 주목",
-    source: "머니투데이",
-    publishedAt: hoursAgo(11),
-    url: "https://example.com/news/5",
-  },
-];
-
-const SYMBOL_NEWS: Record<string, NewsItem[]> = {
-  AAPL: [
+export function buildMarketNews(): NewsItem[] {
+  return [
     {
-      title: "애플, 신형 아이폰 공개 앞두고 부품 수급 확대",
-      source: "Bloomberg",
-      publishedAt: hoursAgo(2),
-      url: "https://example.com/aapl/1",
-      symbol: "AAPL",
-    },
-    {
-      title: "애플 서비스 매출 사상 최대 전망",
-      source: "Reuters",
-      publishedAt: hoursAgo(20),
-      url: "https://example.com/aapl/2",
-      symbol: "AAPL",
-    },
-  ],
-  "005930": [
-    {
-      title: "삼성전자, HBM 공급 확대로 반도체 실적 개선 기대",
+      title: "코스피, 외국인 매수세에 2년 만에 최고치 경신",
       source: "연합뉴스",
-      publishedAt: hoursAgo(4),
-      url: "https://example.com/sec/1",
-      symbol: "005930",
+      publishedAt: hoursAgo(1),
+      url: "https://example.com/news/1",
     },
     {
-      title: "삼성전자 2분기 잠정실적 발표 임박",
+      title: "미 연준, 금리 동결 시사… 기술주 강세",
       source: "한국경제",
-      publishedAt: hoursAgo(26),
-      url: "https://example.com/sec/2",
-      symbol: "005930",
+      publishedAt: hoursAgo(3),
+      url: "https://example.com/news/2",
     },
-  ],
-};
+    {
+      title: "반도체 업황 회복 신호… 수출 지표 개선",
+      source: "매일경제",
+      publishedAt: hoursAgo(5),
+      url: "https://example.com/news/3",
+    },
+    {
+      title: "국내 IPO 시장 활기… 하반기 대어 줄줄이 대기",
+      source: "이데일리",
+      publishedAt: hoursAgo(8),
+      url: "https://example.com/news/4",
+    },
+    {
+      title: "이번 주 실적 발표 앞둔 빅테크 주목",
+      source: "머니투데이",
+      publishedAt: hoursAgo(11),
+      url: "https://example.com/news/5",
+    },
+  ];
+}
+export const MOCK_MARKET_NEWS: NewsItem[] = buildMarketNews();
+
+function buildSymbolNews(): Record<string, NewsItem[]> {
+  return {
+    AAPL: [
+      {
+        title: "애플, 신형 아이폰 공개 앞두고 부품 수급 확대",
+        source: "Bloomberg",
+        publishedAt: hoursAgo(2),
+        url: "https://example.com/aapl/1",
+        symbol: "AAPL",
+      },
+      {
+        title: "애플 서비스 매출 사상 최대 전망",
+        source: "Reuters",
+        publishedAt: hoursAgo(20),
+        url: "https://example.com/aapl/2",
+        symbol: "AAPL",
+      },
+    ],
+    "005930": [
+      {
+        title: "삼성전자, HBM 공급 확대로 반도체 실적 개선 기대",
+        source: "연합뉴스",
+        publishedAt: hoursAgo(4),
+        url: "https://example.com/sec/1",
+        symbol: "005930",
+      },
+      {
+        title: "삼성전자 2분기 잠정실적 발표 임박",
+        source: "한국경제",
+        publishedAt: hoursAgo(26),
+        url: "https://example.com/sec/2",
+        symbol: "005930",
+      },
+    ],
+  };
+}
 
 export function mockNewsFor(symbol?: string): NewsItem[] {
-  if (!symbol) return MOCK_MARKET_NEWS;
-  return SYMBOL_NEWS[symbol] ?? [];
+  if (!symbol) return buildMarketNews();
+  return buildSymbolNews()[symbol] ?? [];
 }
 
 export const MOCK_SYMBOLS: SymbolInfo[] = [
