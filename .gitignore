@@ -37,3 +37,6 @@ pnpm-debug.log*
 
 # Test / coverage
 coverage/
+
+# 로컬 전용 진행현황 메모
+todo.md

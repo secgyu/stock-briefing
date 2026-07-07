@@ -1,0 +1,11 @@
+name = "stock-briefing-api"
+main = "src/index.ts"
+compatibility_date = "2026-06-01"
+
+# P5(실데이터 수집)에서 사용. 지금은 mock 응답이라 비활성.
+# [[kv_namespaces]]
+# binding = "CACHE"
+# id = "<wrangler kv namespace create CACHE 로 발급>"
+
+# [triggers]
+# crons = ["0 * * * *"]  # 매시간 수집
