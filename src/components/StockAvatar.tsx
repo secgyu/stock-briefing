@@ -1,4 +1,5 @@
 import { adaptive } from "@toss/tds-colors";
+import { useState } from "react";
 
 const PALETTE: Array<{ bg: string; fg: string }> = [
   { bg: adaptive.blue100, fg: adaptive.blue600 },
@@ -19,10 +20,36 @@ interface Props {
   name: string;
   seed?: string;
   size?: number;
+  /** 우선순위 로고 URL 후보들. 앞에서부터 시도하고 전부 실패하면 모노그램으로 폴백한다. */
+  logoUrls?: string[];
 }
 
-/** 종목 로고 대신 이름 첫 글자를 색상 원형에 넣은 모노그램 아바타 */
-export function StockAvatar({ name, seed, size = 40 }: Props) {
+/** 로고가 있으면 로고 이미지를, 없거나 모두 깨지면 이름 첫 글자 모노그램을 보여준다. */
+export function StockAvatar({ name, seed, size = 40, logoUrls }: Props) {
+  const [idx, setIdx] = useState(0);
+  const src = logoUrls?.[idx];
+
+  if (src != null) {
+    return (
+      <img
+        src={src}
+        alt=""
+        width={size}
+        height={size}
+        onError={() => setIdx((i) => i + 1)}
+        style={{
+          width: size,
+          height: size,
+          borderRadius: "50%",
+          objectFit: "cover",
+          background: adaptive.grey100,
+          flexShrink: 0,
+        }}
+        aria-hidden
+      />
+    );
+  }
+
   const { bg, fg } = pick(seed ?? name);
   return (
     <div

@@ -2,6 +2,7 @@ import { adaptive } from "@toss/tds-colors";
 import { ListRow, Text } from "@toss/tds-mobile";
 import type { ReactNode } from "react";
 import { earningsTimeLabel, marketFlag, relativeTime } from "../lib/format";
+import { logoCandidates } from "../lib/logo";
 import type { EarningsEvent, IpoEvent, NewsItem, SectorRank } from "../types";
 import { ChangeRate, DdayBadge, EstimatedBadge } from "./badges";
 import { StarIcon } from "./icons";
@@ -52,7 +53,7 @@ export function EarningsRow({
     <ListRow
       onClick={onClick}
       withTouchEffect={onClick != null}
-      left={<StockAvatar name={event.name} seed={event.symbol} />}
+      left={<StockAvatar name={event.name} seed={event.symbol} logoUrls={logoCandidates(event.symbol, event.market)} />}
       contents={
         <div>
           <NameLine name={event.name} />
@@ -78,7 +79,9 @@ export function EarningsRow({
 export function IpoRow({ ipo }: { ipo: IpoEvent }) {
   return (
     <ListRow
-      left={<StockAvatar name={ipo.name} seed={ipo.symbol ?? ipo.name} />}
+      left={
+        <StockAvatar name={ipo.name} seed={ipo.symbol ?? ipo.name} logoUrls={logoCandidates(ipo.symbol, ipo.market)} />
+      }
       contents={
         <div>
           <NameLine name={ipo.name} />

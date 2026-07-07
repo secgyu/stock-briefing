@@ -3,6 +3,7 @@ import { ListRow, Text, TextField, Top } from "@toss/tds-mobile";
 import { useMemo, useState } from "react";
 import { ddayLabel } from "../lib/dday";
 import { marketFlag } from "../lib/format";
+import { logoCandidates } from "../lib/logo";
 import type { UseWatchlist } from "../lib/watchlist";
 import { MOCK_SYMBOLS, nextEarningsFor } from "../mock/dummy";
 import { DdayBadge } from "../components/badges";
@@ -66,7 +67,7 @@ export function WatchScreen({
                 key={s.symbol}
                 onClick={() => onOpenStock(s.symbol)}
                 withTouchEffect
-                left={<StockAvatar name={s.name} seed={s.symbol} />}
+                left={<StockAvatar name={s.name} seed={s.symbol} logoUrls={logoCandidates(s.symbol, s.market)} />}
                 contents={
                   <div>
                     <Text typography="t6" fontWeight="bold" color={adaptive.grey900}>
@@ -103,7 +104,13 @@ export function WatchScreen({
                 key={item.symbol}
                 onClick={() => onOpenStock(item.symbol)}
                 withTouchEffect
-                left={<StockAvatar name={item.name} seed={item.symbol} />}
+                left={
+                  <StockAvatar
+                    name={item.name}
+                    seed={item.symbol}
+                    logoUrls={logoCandidates(item.symbol, item.market)}
+                  />
+                }
                 contents={
                   <div>
                     <Text typography="t6" fontWeight="bold" color={adaptive.grey900}>
