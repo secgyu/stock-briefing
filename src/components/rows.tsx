@@ -124,6 +124,7 @@ export function NewsRow({ news, onClick }: { news: NewsItem; onClick: () => void
       onClick={onClick}
       withTouchEffect
       arrowType="right"
+      left={<StockAvatar name={news.source} seed={news.source} size={40} />}
       contents={
         <div>
           <Text typography="t6" fontWeight="medium" color={adaptive.grey900} ellipsisAfterLines={2}>

@@ -1,12 +1,18 @@
 import { Badge, Text } from "@toss/tds-mobile";
 import { changeColor, formatPct } from "../lib/format";
-import { ddayLabel, isImminent } from "../lib/dday";
+import { ddayLabel, ddayTier } from "../lib/dday";
 
-/** D-day 배지. D-7 이내(오늘 포함)는 빨강으로 임박 강조, 그 외엔 회색 */
+const DDAY_STYLE = {
+  imminent: { variant: "fill", color: "red" },
+  near: { variant: "weak", color: "blue" },
+  far: { variant: "weak", color: "elephant" },
+} as const;
+
+/** D-day 배지. 임박(≤D-2) 빨강, 근접(D-3~D-7) 블루, 그 외 회색 */
 export function DdayBadge({ date }: { date: string }) {
-  const imminent = isImminent(date);
+  const { variant, color } = DDAY_STYLE[ddayTier(date)];
   return (
-    <Badge size="small" variant={imminent ? "fill" : "weak"} color={imminent ? "red" : "elephant"}>
+    <Badge size="small" variant={variant} color={color}>
       {ddayLabel(date)}
     </Badge>
   );

@@ -1,4 +1,4 @@
-import { Top } from "@toss/tds-mobile";
+import { Text, Top } from "@toss/tds-mobile";
 import { daysUntil } from "../lib/dday";
 import { openExternal } from "../lib/external";
 import { useAsyncMock } from "../lib/useAsyncMock";
@@ -15,7 +15,14 @@ interface HomeData {
   ipos: IpoEvent[];
   sectors: SectorRank[];
   news: NewsItem[];
+  earningsThisWeek: number;
+  iposThisWeek: number;
 }
+
+const withinWeek = (date: string, today: Date) => {
+  const d = daysUntil(date, today);
+  return d >= 0 && d <= 7;
+};
 
 function loadHome(): HomeData {
   const today = new Date();
@@ -28,7 +35,29 @@ function loadHome(): HomeData {
       .slice(0, 5),
     sectors: MOCK_SECTORS.slice(0, 5),
     news: MOCK_MARKET_NEWS.slice(0, 5),
+    earningsThisWeek: MOCK_EARNINGS.filter((e) => withinWeek(e.date, today)).length,
+    iposThisWeek: MOCK_IPOS.filter((i) => withinWeek(i.date, today)).length,
   };
+}
+
+const WEEKDAY = ["일", "월", "화", "수", "목", "금", "토"];
+
+/** 상단 히어로. 브랜드 블루로 화면 시선의 앵커를 만들고 이번 주 요약을 제시한다. */
+function HomeHero({ earnings, ipos }: { earnings: number; ipos: number }) {
+  const now = new Date();
+  const dateLabel = `${now.getMonth() + 1}월 ${now.getDate()}일 ${WEEKDAY[now.getDay()]}요일`;
+  return (
+    <div style={{ margin: "4px 16px 16px", borderRadius: 20, padding: "20px 22px", background: "#3182F6" }}>
+      <Text typography="t7" fontWeight="medium" color="rgba(255,255,255,0.75)">
+        {dateLabel}
+      </Text>
+      <div style={{ marginTop: 6 }}>
+        <Text typography="t3" fontWeight="bold" color="#FFFFFF">
+          이번 주 실적 {earnings}건 · 상장 {ipos}건
+        </Text>
+      </div>
+    </div>
+  );
 }
 
 export function HomeScreen({
@@ -55,6 +84,8 @@ export function HomeScreen({
   return (
     <Screen>
       <Top title={<Top.TitleParagraph size={22}>주식브리핑</Top.TitleParagraph>} />
+
+      <HomeHero earnings={data?.earningsThisWeek ?? 0} ipos={data?.iposThisWeek ?? 0} />
 
       <SectionCard>
         <SectionHeader title="내 관심종목" moreLabel="관심 관리" onMore={onGoWatch} />

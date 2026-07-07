@@ -16,8 +16,15 @@ export function ddayLabel(dateStr: string, from: Date = new Date()): string {
   return diff > 0 ? `D-${diff}` : `D+${-diff}`;
 }
 
-/** D-7 이내(오늘 포함)면 임박으로 강조 */
-export function isImminent(dateStr: string, from: Date = new Date()): boolean {
+export type DdayTier = "imminent" | "near" | "far";
+
+/**
+ * D-day 강조 단계. 빨강 남용을 막으려 임박(≤D-2)만 빨강, 근접(D-3~D-7)은
+ * 브랜드 블루, 그 외(D-8+ / 과거)는 회색으로 위계를 준다.
+ */
+export function ddayTier(dateStr: string, from: Date = new Date()): DdayTier {
   const diff = daysUntil(dateStr, from);
-  return diff >= 0 && diff <= 7;
+  if (diff >= 0 && diff <= 2) return "imminent";
+  if (diff >= 3 && diff <= 7) return "near";
+  return "far";
 }
