@@ -155,7 +155,10 @@ export function HomeScreen({
           onRetry={retry}
           empty={<EmptyState title="집계된 지표가 없어요" />}
         >
-          {(list) => list.map((s) => <SectorRow key={`${s.market}-${s.name}`} sector={s} />)}
+          {(list) => {
+            const maxAbs = Math.max(0, ...list.map((s) => Math.abs(s.weeklyChangePct)));
+            return list.map((s) => <SectorRow key={`${s.market}-${s.name}`} sector={s} maxAbs={maxAbs} />);
+          }}
         </AsyncSection>
       </SectionCard>
 

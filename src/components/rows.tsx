@@ -1,7 +1,7 @@
 import { adaptive } from "@toss/tds-colors";
 import { ListRow, Text } from "@toss/tds-mobile";
 import type { ReactNode } from "react";
-import { earningsTimeLabel, marketFlag, relativeTime } from "../lib/format";
+import { changeColor, earningsTimeLabel, marketFlag, relativeTime } from "../lib/format";
 import { logoCandidates } from "../lib/logo";
 import type { EarningsEvent, IpoEvent, NewsItem, SectorRank } from "../types";
 import { ChangeRate, DdayBadge, EstimatedBadge } from "./badges";
@@ -98,7 +98,15 @@ export function IpoRow({ ipo }: { ipo: IpoEvent }) {
   );
 }
 
-export function SectorRow({ sector }: { sector: SectorRank }) {
+// 약세장(모든 산업 소폭)일 때 막대가 과장되지 않도록 두는 최소 정규화 기준.
+// 그 주 최대 |등락률|이 이보다 작으면 이 값으로 나눠 막대를 짧게 유지한다.
+const SECTOR_MIN_SCALE = 3;
+
+export function SectorRow({ sector, maxAbs }: { sector: SectorRank; maxAbs: number }) {
+  const pct = sector.weeklyChangePct;
+  // 그 주 최대값 기준 상대 정규화 → 값이 아무리 커도 막대는 100%를 넘지 않는다.
+  const denom = Math.max(maxAbs, SECTOR_MIN_SCALE);
+  const width = Math.min(Math.abs(pct) / denom, 1) * 100;
   return (
     <ListRow
       left={
@@ -109,11 +117,26 @@ export function SectorRow({ sector }: { sector: SectorRank }) {
         </div>
       }
       contents={
-        <Text typography="t6" fontWeight="bold" color={adaptive.grey900}>
-          {marketFlag(sector.market)} {sector.name}
-        </Text>
+        <div>
+          <Text typography="t6" fontWeight="bold" color={adaptive.grey900}>
+            {marketFlag(sector.market)} {sector.name}
+          </Text>
+          <div
+            style={{
+              marginTop: 6,
+              width: 132,
+              maxWidth: "100%",
+              height: 6,
+              borderRadius: 3,
+              background: adaptive.grey100,
+              overflow: "hidden",
+            }}
+          >
+            <div style={{ height: "100%", width: `${width}%`, background: changeColor(pct), borderRadius: 3 }} />
+          </div>
+        </div>
       }
-      right={<ChangeRate pct={sector.weeklyChangePct} />}
+      right={<ChangeRate pct={pct} />}
     />
   );
 }
