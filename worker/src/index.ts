@@ -11,6 +11,7 @@ import {
   US_INFO,
   US_SYMBOLS,
 } from "./finnhub";
+import { fetchNaverNews, type NaverEnv } from "./naver";
 
 // 검색·상세용 종목 마스터: KR mock + 미국 유니버스(88). 중복 심볼은 exchange가 있는 mock을 우선.
 const SYMBOL_MASTER: SymbolInfo[] = [
@@ -23,7 +24,7 @@ const SYMBOL_MASTER: SymbolInfo[] = [
 // 상대 날짜 mock은 반드시 builder(buildEarnings 등)를 요청 시점에 호출한다.
 // Workers는 모듈 로드 시 new Date()=epoch(0)이라 eager 상수를 쓰면 날짜가 1970이 된다.
 
-interface WorkerEnv extends Env {
+interface WorkerEnv extends Env, NaverEnv {
   CACHE: KVNamespace;
 }
 
@@ -45,6 +46,14 @@ async function cached<T>(env: WorkerEnv, key: string, ttlSec: number, producer: 
 const IPO_TTL = 21600; // 6h
 const QUOTE_TTL = 60; // KV 최소 TTL. 장중 클라 폴링과 맞물려 ~1분 단위 갱신
 const PROFILE_TTL = 86400; // 시총·통화는 장중 불변 → 24h
+const NEWS_TTL = 600; // 뉴스 10분 캐시 (네이버 25k/일 한도 여유)
+
+/** 뉴스 검색어: 종목이면 "이름 주가", 없으면 시장 전반. 이름은 종목 마스터에서 조회. */
+function newsQuery(symbol?: string): string {
+  if (!symbol) return "증시";
+  // 종목명만으로 검색. "주가" 등 접미사는 관련도(sim)에서 오히려 노이즈를 끌어온다.
+  return SYMBOL_MASTER.find((s) => s.symbol === symbol)?.name ?? symbol;
+}
 
 // 미국 실적: 종목당 1콜이라 유니버스 전체를 한 요청에 못 부른다(외부 fetch 50개/요청 한계).
 // 25개씩 청크로 나눠 KV에 저장하고, 매 요청은 "가장 오래된 청크 1개"만 갱신한다.
@@ -231,9 +240,18 @@ export default {
       case "/sectors":
         return json(MOCK_SECTORS);
 
-      // 종목 뉴스(?symbol=) 없으면 시장 뉴스
-      case "/news":
-        return json(mockNewsFor(symbol));
+      // 종목 뉴스(?symbol=) 없으면 시장 뉴스. 네이버 검색 API, 실패/키미설정 시 mock 폴백.
+      case "/news": {
+        try {
+          return json(
+            await cached(env, `news:${symbol ?? "market"}`, NEWS_TTL, () =>
+              fetchNaverNews(newsQuery(symbol), env, symbol),
+            ),
+          );
+        } catch {
+          return json(mockNewsFor(symbol));
+        }
+      }
 
       // 종목 검색 ?q=
       case "/symbols":
