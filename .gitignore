@@ -13,8 +13,9 @@ build/
 .granite/
 .ait/
 
-# Cloudflare Wrangler 로컬 캐시
+# Cloudflare Wrangler 로컬 캐시 · 시크릿
 .wrangler/
+.dev.vars
 
 # Env & secrets
 .env

@@ -1,10 +1,90 @@
 import { daysUntil } from "../../src/lib/dday";
+import type { EarningsEvent, IpoEvent } from "../../src/types";
 import { buildEarnings, buildIpos, MOCK_SECTORS, MOCK_SYMBOLS, mockNewsFor } from "../../src/mock/dummy";
+import { type Env, fetchUsEarningsForSymbol, fetchUsEarningsForSymbols, fetchUsIpos, US_SYMBOLS } from "./finnhub";
 
-// ponytail: P3는 프론트 mock을 그대로 재사용해 응답만 흉내낸다. P4에서 프론트가
-// 이 Worker를 호출하도록 바꾸고, P5에서 이 mock을 KV 캐시(실데이터)로 교체한다.
+// P5: 미국 실적/IPO는 Finnhub 실데이터. 국내(KR)는 아직 mock을 병합해 화면을 채운다.
+// (DART 붙일 때 KR mock만 교체) sectors/news/symbols는 아직 mock.
 // 상대 날짜 mock은 반드시 builder(buildEarnings 등)를 요청 시점에 호출한다.
 // Workers는 모듈 로드 시 new Date()=epoch(0)이라 eager 상수를 쓰면 날짜가 1970이 된다.
+
+interface WorkerEnv extends Env {
+  CACHE: KVNamespace;
+}
+
+/** 6자리 숫자면 국내 종목으로 간주(예: 005930). */
+const isKr = (s: string) => /^\d{6}$/.test(s);
+
+/**
+ * KV 캐시(cache-aside). 미국 실적은 종목당 1콜씩 ~30콜이라 매 요청 fetch는 rate limit을 넘는다.
+ * 캐시가 있으면 그대로, 없으면 producer 실행 후 ttlSec 동안 보관.
+ */
+async function cached<T>(env: WorkerEnv, key: string, ttlSec: number, producer: () => Promise<T>): Promise<T> {
+  const hit = await env.CACHE.get<T>(key, "json");
+  if (hit != null) return hit;
+  const val = await producer();
+  await env.CACHE.put(key, JSON.stringify(val), { expirationTtl: ttlSec });
+  return val;
+}
+
+const IPO_TTL = 21600; // 6h
+
+// 미국 실적: 종목당 1콜이라 유니버스 전체를 한 요청에 못 부른다(외부 fetch 50개/요청 한계).
+// 25개씩 청크로 나눠 KV에 저장하고, 매 요청은 "가장 오래된 청크 1개"만 갱신한다.
+// 3시간 지난 청크만 다시 부르므로 평소 Finnhub 호출은 0에 가깝다(rate limit 안전).
+const CHUNK_SIZE = 25;
+const CHUNK_STALE_MS = 3 * 3600_000;
+const CHUNK_KEY_VER = "v3-kst"; // 데이터 형식 바뀌면 올려 캐시 무효화
+
+interface ChunkCell {
+  at: number;
+  data: EarningsEvent[];
+}
+
+function usChunks(): string[][] {
+  const out: string[][] = [];
+  for (let i = 0; i < US_SYMBOLS.length; i += CHUNK_SIZE) out.push(US_SYMBOLS.slice(i, i + CHUNK_SIZE));
+  return out;
+}
+
+/** 청크 회전 캐시로 미국 실적을 모은다. Finnhub 실패·완전 콜드면 mock US로 폴백. */
+async function usEarnings(env: WorkerEnv): Promise<EarningsEvent[]> {
+  const chunks = usChunks();
+  const cells = await Promise.all(chunks.map((_, i) => env.CACHE.get<ChunkCell>(`earn:${CHUNK_KEY_VER}:${i}`, "json")));
+
+  const now = Date.now();
+  let stalest = 0;
+  let worstAge = -1;
+  cells.forEach((c, i) => {
+    const age = c ? now - c.at : Infinity;
+    if (age > worstAge) {
+      worstAge = age;
+      stalest = i;
+    }
+  });
+
+  if (worstAge > CHUNK_STALE_MS) {
+    try {
+      const data = await fetchUsEarningsForSymbols(chunks[stalest], env);
+      const cell: ChunkCell = { at: now, data };
+      await env.CACHE.put(`earn:${CHUNK_KEY_VER}:${stalest}`, JSON.stringify(cell), { expirationTtl: 172800 });
+      cells[stalest] = cell;
+    } catch {
+      // 갱신 실패 시 기존 청크 유지
+    }
+  }
+
+  const merged = cells.flatMap((c) => c?.data ?? []);
+  return merged.length > 0 ? merged : buildEarnings().filter((e) => e.market === "US");
+}
+
+async function usIpos(env: WorkerEnv): Promise<IpoEvent[]> {
+  try {
+    return await cached(env, "us-ipos", IPO_TTL, () => fetchUsIpos(env));
+  } catch {
+    return buildIpos().filter((i) => i.market === "US");
+  }
+}
 
 const CORS = {
   "Access-Control-Allow-Origin": "*",
@@ -67,7 +147,7 @@ footer{color:#5c616b;font-size:12px;margin-top:24px}
 }
 
 export default {
-  fetch(req: Request): Response {
+  async fetch(req: Request, env: WorkerEnv): Promise<Response> {
     if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: CORS });
     if (req.method !== "GET") return new Response("Method Not Allowed", { status: 405, headers: CORS });
 
@@ -80,19 +160,38 @@ export default {
       case "/":
         return indexHtml();
 
-      case "/earnings/upcoming":
-        return json(upcoming(buildEarnings()).slice(0, 50));
+      // 미국(Finnhub 실데이터) + 국내(mock) 병합 후 임박순.
+      case "/earnings/upcoming": {
+        const us = await usEarnings(env);
+        const kr = buildEarnings().filter((e) => e.market === "KR");
+        return json(upcoming([...us, ...kr]).slice(0, 50));
+      }
 
-      // 특정 종목 실적 (상세 화면). ?symbol=AAPL
-      case "/earnings":
-        return json(
-          buildEarnings()
-            .filter((e) => e.symbol === symbol)
-            .sort(byDate),
-        );
+      // 특정 종목 실적 (상세 화면). ?symbol=AAPL / 국내는 mock.
+      case "/earnings": {
+        if (!symbol) return json([]);
+        if (isKr(symbol))
+          return json(
+            buildEarnings()
+              .filter((e) => e.symbol === symbol)
+              .sort(byDate),
+          );
+        try {
+          return json((await fetchUsEarningsForSymbol(symbol, env)).sort(byDate));
+        } catch {
+          return json(
+            buildEarnings()
+              .filter((e) => e.symbol === symbol)
+              .sort(byDate),
+          );
+        }
+      }
 
-      case "/ipo":
-        return json(upcoming(buildIpos()).slice(0, 50));
+      case "/ipo": {
+        const us = await usIpos(env);
+        const kr = buildIpos().filter((i) => i.market === "KR");
+        return json(upcoming([...us, ...kr]).slice(0, 50));
+      }
 
       case "/sectors":
         return json(MOCK_SECTORS);

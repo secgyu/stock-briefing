@@ -2,10 +2,10 @@ name = "stock-briefing-api"
 main = "src/index.ts"
 compatibility_date = "2026-06-01"
 
-# P5(실데이터 수집)에서 사용. 지금은 mock 응답이라 비활성.
-# [[kv_namespaces]]
-# binding = "CACHE"
-# id = "<wrangler kv namespace create CACHE 로 발급>"
+# 미국 실적/IPO 캐시 (cache-aside, TTL 6h). rate limit 회피용.
+[[kv_namespaces]]
+binding = "CACHE"
+id = "a571da46fbef42ac96a5cf0957cd7b9d"
 
 # [triggers]
-# crons = ["0 * * * *"]  # 매시간 수집
+# crons = ["0 * * * *"]  # 매시간 선수집(필요 시)
