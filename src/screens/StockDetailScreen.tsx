@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { adaptive } from "@toss/tds-colors";
 import { Button, ListRow, Text, Top } from "@toss/tds-mobile";
 import { api } from "../api/client";
@@ -16,7 +16,7 @@ import {
   marketFlag,
   marketLabel,
 } from "../lib/format";
-import { useAsync } from "../lib/useAsync";
+import { queryStatus } from "../lib/queryClient";
 import type { UseWatchlist } from "../lib/watchlist";
 import { DdayBadge, EstimatedBadge } from "../components/badges";
 import { SectionCard, SectionHeader, Screen } from "../components/layout";
@@ -29,57 +29,22 @@ const DART_SEARCH = "https://dart.fss.or.kr/dsab007/main.do";
 
 interface DetailData {
   info?: SymbolInfo;
-  quote: Quote | null;
   next?: EarningsEvent;
   news: NewsItem[];
 }
 
 async function loadDetail(symbol: string): Promise<DetailData> {
-  const [symbols, earnings, news, quote] = await Promise.all([
-    api.symbols(symbol),
-    api.earnings(symbol),
-    api.news(symbol),
-    api.quote(symbol),
-  ]);
+  const [symbols, earnings, news] = await Promise.all([api.symbols(symbol), api.earnings(symbol), api.news(symbol)]);
   const today = new Date();
   const next = earnings.filter((e) => daysUntil(e.date, today) >= 0).sort((a, b) => a.date.localeCompare(b.date))[0];
   // 종목 마스터에 없더라도 실적 데이터(심볼·이름·시장)로 최소 정보를 구성해 상세를 보여준다.
   const found = symbols.find((s) => s.symbol === symbol);
   const e0 = earnings[0];
   const info = found ?? (e0 ? { symbol: e0.symbol, name: e0.name, market: e0.market, exchange: "" } : undefined);
-  return { info, quote, next, news };
+  return { info, next, news };
 }
 
 const POLL_MS = 30_000;
-
-/**
- * 미국 정규장 중, 화면이 보일 때만 시세를 30초 주기로 폴링한다.
- * 로딩 상태를 건드리지 않고 값만 교체해 깜빡임이 없다. 장 마감/백그라운드면 호출하지 않는다.
- */
-function useLiveQuote(symbol: string, initial: Quote | null): Quote | null {
-  const [quote, setQuote] = useState<Quote | null>(initial);
-  // 초기 로드(또는 종목 변경)로 새 값이 들어오면 반영.
-  useEffect(() => setQuote(initial), [initial]);
-  useEffect(() => {
-    let alive = true;
-    const tick = async () => {
-      if (typeof document !== "undefined" && document.hidden) return;
-      if (!isUsMarketOpen()) return;
-      try {
-        const fresh = await api.quote(symbol);
-        if (alive && fresh) setQuote(fresh);
-      } catch {
-        // 폴링 실패는 조용히 무시하고 다음 주기에 재시도
-      }
-    };
-    const id = setInterval(tick, POLL_MS);
-    return () => {
-      alive = false;
-      clearInterval(id);
-    };
-  }, [symbol]);
-  return quote;
-}
 
 export function StockDetailScreen({
   symbol,
@@ -90,9 +55,16 @@ export function StockDetailScreen({
   watchlist: UseWatchlist;
   onBack: () => void;
 }) {
-  const { status, data, retry } = useAsync(() => loadDetail(symbol), [symbol]);
+  const detail = useQuery({ queryKey: ["detail", symbol], queryFn: () => loadDetail(symbol) });
+  // 시세는 별도 쿼리로 분리: 미국 정규장 중에만 30초 주기로 자동 갱신(장 마감/백그라운드면 멈춤).
+  const quoteQuery = useQuery({
+    queryKey: ["quote", symbol],
+    queryFn: () => api.quote(symbol),
+    staleTime: 0, // 재진입·포커스 복귀 때 항상 최신 시세로
+    refetchInterval: () => (isUsMarketOpen() ? POLL_MS : false),
+  });
+  const status = queryStatus(detail);
   const watched = watchlist.isWatched(symbol);
-  const liveQuote = useLiveQuote(symbol, data?.quote ?? null);
 
   if (status === "loading") {
     return (
@@ -107,13 +79,14 @@ export function StockDetailScreen({
     return (
       <Screen>
         <BackBar onBack={onBack} />
-        <ErrorState onRetry={retry} />
+        <ErrorState onRetry={() => void detail.refetch()} />
       </Screen>
     );
   }
 
+  const data = detail.data;
   const info = data?.info;
-  const quote = liveQuote;
+  const quote = quoteQuery.data ?? null;
   const next = data?.next;
   const news = data?.news ?? [];
 

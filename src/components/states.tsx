@@ -1,6 +1,7 @@
 import { adaptive } from "@toss/tds-colors";
 import { Button, Skeleton, Text } from "@toss/tds-mobile";
 import type { ReactNode } from "react";
+import type { AsyncStatus } from "../lib/queryClient";
 
 /** 빈 상태: 안내 문구 + (선택) 액션 버튼 */
 export function EmptyState({
@@ -92,7 +93,7 @@ export function AsyncSection<T>({
   empty,
   children,
 }: {
-  status: "loading" | "error" | "ready";
+  status: AsyncStatus;
   data: T[];
   onRetry?: () => void;
   skeleton?: ReactNode;

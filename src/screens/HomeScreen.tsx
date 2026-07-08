@@ -1,10 +1,11 @@
 import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { adaptive } from "@toss/tds-colors";
 import { Text, Top } from "@toss/tds-mobile";
 import { api } from "../api/client";
 import { daysUntil } from "../lib/dday";
 import { openExternal } from "../lib/external";
-import { type AsyncStatus, useAsync } from "../lib/useAsync";
+import { type AsyncStatus, queryStatus } from "../lib/queryClient";
 import type { UseWatchlist } from "../lib/watchlist";
 import { DisclaimerFooter } from "../components/DisclaimerFooter";
 import { SectionCard, SectionHeader, Screen } from "../components/layout";
@@ -174,7 +175,10 @@ export function HomeScreen({
   onGoWatch: () => void;
   onGoCalendar: () => void;
 }) {
-  const { status, data, retry } = useAsync(loadHome);
+  const home = useQuery({ queryKey: ["home"], queryFn: loadHome });
+  const status = queryStatus(home);
+  const data = home.data;
+  const retry = () => void home.refetch();
 
   const watched = watchlist.items
     .map((w) => ({ item: w, next: nextEarningsFrom(data?.allUpcoming ?? [], w.symbol) }))

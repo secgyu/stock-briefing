@@ -1,9 +1,10 @@
 import { adaptive } from "@toss/tds-colors";
 import { Tab, Text, Top } from "@toss/tds-mobile";
 import { useMemo, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { api } from "../api/client";
 import { formatDateKo } from "../lib/format";
-import { useAsync } from "../lib/useAsync";
+import { queryStatus } from "../lib/queryClient";
 import type { UseWatchlist } from "../lib/watchlist";
 import { SectionCard, Screen } from "../components/layout";
 import { EarningsRow, IpoRow } from "../components/rows";
@@ -53,10 +54,16 @@ export function CalendarScreen({
   const [monthAnchor, setMonthAnchor] = useState(() => new Date(today.getFullYear(), today.getMonth(), 1));
   const market = MARKET_BY_INDEX[filterIndex];
 
-  const { status, data, retry } = useAsync<CalendarData>(async () => {
-    const [earnings, ipos] = await Promise.all([api.upcomingEarnings(), api.ipos()]);
-    return { earnings, ipos };
+  const calendar = useQuery({
+    queryKey: ["calendar"],
+    queryFn: async (): Promise<CalendarData> => {
+      const [earnings, ipos] = await Promise.all([api.upcomingEarnings(), api.ipos()]);
+      return { earnings, ipos };
+    },
   });
+  const status = queryStatus(calendar);
+  const data = calendar.data;
+  const retry = () => void calendar.refetch();
 
   const weekDays = useMemo(
     () =>

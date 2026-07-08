@@ -1,11 +1,12 @@
 import { adaptive } from "@toss/tds-colors";
 import { ListRow, Text, TextField, Top } from "@toss/tds-mobile";
 import { useEffect, useMemo, useState } from "react";
+import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { api } from "../api/client";
 import { ddayLabel } from "../lib/dday";
 import { marketFlag } from "../lib/format";
 import { logoCandidates } from "../lib/logo";
-import { useAsync } from "../lib/useAsync";
+import { queryStatus } from "../lib/queryClient";
 import type { UseWatchlist } from "../lib/watchlist";
 import { DdayBadge } from "../components/badges";
 import { SectionCard, SectionHeader, Screen } from "../components/layout";
@@ -30,10 +31,16 @@ export function WatchScreen({
     return () => clearTimeout(t);
   }, [q]);
 
-  const search = useAsync(() => (debouncedQ === "" ? Promise.resolve([]) : api.symbols(debouncedQ)), [debouncedQ]);
+  // 검색어별로 캐시. 타이핑 중엔 이전 결과를 유지해 깜빡임을 없앤다.
+  const search = useQuery({
+    queryKey: ["symbols", debouncedQ],
+    queryFn: () => api.symbols(debouncedQ),
+    enabled: debouncedQ !== "",
+    placeholderData: keepPreviousData,
+  });
 
   // 관심종목의 "다음 실적"은 다가오는 실적 전체에서 파생한다.
-  const upcoming = useAsync(() => api.upcomingEarnings(), []);
+  const upcoming = useQuery({ queryKey: ["earnings", "upcoming"], queryFn: api.upcomingEarnings });
   const nextOf = (symbol: string) => (upcoming.data ?? []).find((e) => e.symbol === symbol);
 
   const sortedWatch = useMemo(
@@ -66,9 +73,9 @@ export function WatchScreen({
         <SectionCard>
           <SectionHeader title="검색 결과" />
           <AsyncSection
-            status={search.status}
+            status={queryStatus(search)}
             data={search.data ?? []}
-            onRetry={search.retry}
+            onRetry={() => void search.refetch()}
             empty={<EmptyState title="검색 결과가 없어요" description="다른 종목명이나 티커로 검색해 보세요." />}
           >
             {(list) =>
