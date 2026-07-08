@@ -23,25 +23,34 @@ import { SectionCard, SectionHeader, Screen } from "../components/layout";
 import { NewsRow } from "../components/rows";
 import { EmptyState, ErrorState, ListSkeleton } from "../components/states";
 import { ChevronRightIcon } from "../components/icons";
-import type { EarningsEvent, NewsItem, Quote, SymbolInfo } from "../types";
+import type { Disclosure, EarningsEvent, NewsItem, Quote, SymbolInfo } from "../types";
 
 const DART_SEARCH = "https://dart.fss.or.kr/dsab007/main.do";
+
+/** 6자리 숫자면 국내 종목. 국내만 DART 공시를 조회한다. */
+const isKr = (s: string) => /^\d{6}$/.test(s);
 
 interface DetailData {
   info?: SymbolInfo;
   next?: EarningsEvent;
   news: NewsItem[];
+  disclosures: Disclosure[];
 }
 
 async function loadDetail(symbol: string): Promise<DetailData> {
-  const [symbols, earnings, news] = await Promise.all([api.symbols(symbol), api.earnings(symbol), api.news(symbol)]);
+  const [symbols, earnings, news, disclosures] = await Promise.all([
+    api.symbols(symbol),
+    api.earnings(symbol),
+    api.news(symbol),
+    isKr(symbol) ? api.disclosures(symbol) : Promise.resolve<Disclosure[]>([]),
+  ]);
   const today = new Date();
   const next = earnings.filter((e) => daysUntil(e.date, today) >= 0).sort((a, b) => a.date.localeCompare(b.date))[0];
   // 종목 마스터에 없더라도 실적 데이터(심볼·이름·시장)로 최소 정보를 구성해 상세를 보여준다.
   const found = symbols.find((s) => s.symbol === symbol);
   const e0 = earnings[0];
   const info = found ?? (e0 ? { symbol: e0.symbol, name: e0.name, market: e0.market, exchange: "" } : undefined);
-  return { info, next, news };
+  return { info, next, news, disclosures };
 }
 
 const POLL_MS = 30_000;
@@ -89,6 +98,7 @@ export function StockDetailScreen({
   const quote = quoteQuery.data ?? null;
   const next = data?.next;
   const news = data?.news ?? [];
+  const disclosures = data?.disclosures ?? [];
 
   if (!info) {
     return (
@@ -164,13 +174,37 @@ export function StockDetailScreen({
 
       {info.market === "KR" && (
         <SectionCard>
-          <SectionHeader title="최근 공시" />
+          <SectionHeader title="최근 공시" caption="금융감독원 전자공시(DART)" />
+          {disclosures.length === 0 ? (
+            <EmptyState title="최근 공시가 없어요" />
+          ) : (
+            disclosures.map((d) => (
+              <ListRow
+                key={d.url}
+                onClick={() => openExternal(d.url)}
+                withTouchEffect
+                contents={
+                  <div>
+                    <Text typography="t6" fontWeight="medium" color={adaptive.grey900}>
+                      {d.title}
+                    </Text>
+                    <div style={{ marginTop: 2 }}>
+                      <Text typography="t7" color={adaptive.grey500}>
+                        {d.filer} · {formatDateKo(d.date)}
+                      </Text>
+                    </div>
+                  </div>
+                }
+                right={<ChevronRightIcon color={adaptive.grey400} />}
+              />
+            ))
+          )}
           <ListRow
             onClick={() => openExternal(DART_SEARCH)}
             withTouchEffect
             contents={
-              <Text typography="t6" fontWeight="medium" color={adaptive.grey900}>
-                DART 전자공시에서 보기
+              <Text typography="t7" fontWeight="medium" color={adaptive.blue500}>
+                DART에서 전체 공시 보기
               </Text>
             }
             right={<ChevronRightIcon color={adaptive.grey400} />}

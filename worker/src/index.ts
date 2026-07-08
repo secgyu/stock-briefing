@@ -12,6 +12,7 @@ import {
   US_SYMBOLS,
 } from "./finnhub";
 import { fetchNaverNews, type NaverEnv } from "./naver";
+import { type DartEnv, fetchKrDisclosures } from "./dart";
 
 // 검색·상세용 종목 마스터: KR mock + 미국 유니버스(88). 중복 심볼은 exchange가 있는 mock을 우선.
 const SYMBOL_MASTER: SymbolInfo[] = [
@@ -24,7 +25,7 @@ const SYMBOL_MASTER: SymbolInfo[] = [
 // 상대 날짜 mock은 반드시 builder(buildEarnings 등)를 요청 시점에 호출한다.
 // Workers는 모듈 로드 시 new Date()=epoch(0)이라 eager 상수를 쓰면 날짜가 1970이 된다.
 
-interface WorkerEnv extends Env, NaverEnv {
+interface WorkerEnv extends Env, NaverEnv, DartEnv {
   CACHE: KVNamespace;
 }
 
@@ -47,6 +48,7 @@ const IPO_TTL = 21600; // 6h
 const QUOTE_TTL = 60; // KV 최소 TTL. 장중 클라 폴링과 맞물려 ~1분 단위 갱신
 const PROFILE_TTL = 86400; // 시총·통화는 장중 불변 → 24h
 const NEWS_TTL = 600; // 뉴스 10분 캐시 (네이버 25k/일 한도 여유)
+const DISCLOSURE_TTL = 3600; // 공시 1시간 캐시 (DART 20k/일 한도 여유)
 
 /** 뉴스 검색어: 종목이면 "이름 주가", 없으면 시장 전반. 이름은 종목 마스터에서 조회. */
 function newsQuery(symbol?: string): string {
@@ -136,6 +138,7 @@ const ROUTES: { path: string; desc: string }[] = [
   { path: "/ipo", desc: "다가오는 공모주(IPO)" },
   { path: "/sectors", desc: "산업별 주간 등락률" },
   { path: "/news", desc: "시장 뉴스 (또는 ?symbol=005930 종목 뉴스)" },
+  { path: "/disclosures?symbol=005930", desc: "국내 종목 최근 공시 (DART)" },
   { path: "/symbols?q=삼성", desc: "종목 검색" },
 ];
 
@@ -250,6 +253,16 @@ export default {
           );
         } catch {
           return json(mockNewsFor(symbol));
+        }
+      }
+
+      // 국내 종목 최근 공시(DART). 미국/유니버스 밖은 빈 배열. 실패 시에도 빈 배열(앱 안 죽음).
+      case "/disclosures": {
+        if (!symbol || !isKr(symbol)) return json([]);
+        try {
+          return json(await cached(env, `disc:${symbol}`, DISCLOSURE_TTL, () => fetchKrDisclosures(symbol, env)));
+        } catch {
+          return json([]);
         }
       }
 

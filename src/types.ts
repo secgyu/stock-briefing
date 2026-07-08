@@ -49,6 +49,13 @@ export interface SymbolInfo {
   exchange: string;
 }
 
+export interface Disclosure {
+  title: string; // 보고서명 (report_nm)
+  filer: string; // 제출인 (flr_nm)
+  date: string; // 접수일 YYYY-MM-DD
+  url: string; // 공시 원문 뷰어 링크
+}
+
 export interface Quote {
   price: number;
   change: number; // 전일 대비 (통화 단위)
