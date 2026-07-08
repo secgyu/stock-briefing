@@ -1,9 +1,21 @@
+import { useEffect, useState } from "react";
 import { adaptive } from "@toss/tds-colors";
 import { Button, ListRow, Text, Top } from "@toss/tds-mobile";
 import { api } from "../api/client";
+import { isUsMarketOpen } from "../lib/market";
 import { daysUntil } from "../lib/dday";
 import { openExternal } from "../lib/external";
-import { earningsTimeLabel, formatDateKo, marketFlag, marketLabel } from "../lib/format";
+import {
+  changeColor,
+  earningsTimeLabel,
+  formatDateKo,
+  formatDateTimeKo,
+  formatMarketCap,
+  formatPct,
+  formatPrice,
+  marketFlag,
+  marketLabel,
+} from "../lib/format";
 import { useAsync } from "../lib/useAsync";
 import type { UseWatchlist } from "../lib/watchlist";
 import { DdayBadge, EstimatedBadge } from "../components/badges";
@@ -11,25 +23,62 @@ import { SectionCard, SectionHeader, Screen } from "../components/layout";
 import { NewsRow } from "../components/rows";
 import { EmptyState, ErrorState, ListSkeleton } from "../components/states";
 import { ChevronRightIcon } from "../components/icons";
-import type { EarningsEvent, NewsItem, SymbolInfo } from "../types";
+import type { EarningsEvent, NewsItem, Quote, SymbolInfo } from "../types";
 
 const DART_SEARCH = "https://dart.fss.or.kr/dsab007/main.do";
 
 interface DetailData {
   info?: SymbolInfo;
+  quote: Quote | null;
   next?: EarningsEvent;
   news: NewsItem[];
 }
 
 async function loadDetail(symbol: string): Promise<DetailData> {
-  const [symbols, earnings, news] = await Promise.all([api.symbols(symbol), api.earnings(symbol), api.news(symbol)]);
+  const [symbols, earnings, news, quote] = await Promise.all([
+    api.symbols(symbol),
+    api.earnings(symbol),
+    api.news(symbol),
+    api.quote(symbol),
+  ]);
   const today = new Date();
   const next = earnings.filter((e) => daysUntil(e.date, today) >= 0).sort((a, b) => a.date.localeCompare(b.date))[0];
   // 종목 마스터에 없더라도 실적 데이터(심볼·이름·시장)로 최소 정보를 구성해 상세를 보여준다.
   const found = symbols.find((s) => s.symbol === symbol);
   const e0 = earnings[0];
   const info = found ?? (e0 ? { symbol: e0.symbol, name: e0.name, market: e0.market, exchange: "" } : undefined);
-  return { info, next, news };
+  return { info, quote, next, news };
+}
+
+const POLL_MS = 30_000;
+
+/**
+ * 미국 정규장 중, 화면이 보일 때만 시세를 30초 주기로 폴링한다.
+ * 로딩 상태를 건드리지 않고 값만 교체해 깜빡임이 없다. 장 마감/백그라운드면 호출하지 않는다.
+ */
+function useLiveQuote(symbol: string, initial: Quote | null): Quote | null {
+  const [quote, setQuote] = useState<Quote | null>(initial);
+  // 초기 로드(또는 종목 변경)로 새 값이 들어오면 반영.
+  useEffect(() => setQuote(initial), [initial]);
+  useEffect(() => {
+    let alive = true;
+    const tick = async () => {
+      if (typeof document !== "undefined" && document.hidden) return;
+      if (!isUsMarketOpen()) return;
+      try {
+        const fresh = await api.quote(symbol);
+        if (alive && fresh) setQuote(fresh);
+      } catch {
+        // 폴링 실패는 조용히 무시하고 다음 주기에 재시도
+      }
+    };
+    const id = setInterval(tick, POLL_MS);
+    return () => {
+      alive = false;
+      clearInterval(id);
+    };
+  }, [symbol]);
+  return quote;
 }
 
 export function StockDetailScreen({
@@ -43,6 +92,7 @@ export function StockDetailScreen({
 }) {
   const { status, data, retry } = useAsync(() => loadDetail(symbol), [symbol]);
   const watched = watchlist.isWatched(symbol);
+  const liveQuote = useLiveQuote(symbol, data?.quote ?? null);
 
   if (status === "loading") {
     return (
@@ -63,6 +113,7 @@ export function StockDetailScreen({
   }
 
   const info = data?.info;
+  const quote = liveQuote;
   const next = data?.next;
   const news = data?.news ?? [];
 
@@ -86,6 +137,8 @@ export function StockDetailScreen({
           </Top.SubtitleParagraph>
         }
       />
+
+      {quote && <QuoteHeader quote={quote} />}
 
       <div style={{ padding: "4px 24px 16px" }}>
         <Button
@@ -152,6 +205,32 @@ export function StockDetailScreen({
         </SectionCard>
       )}
     </Screen>
+  );
+}
+
+function QuoteHeader({ quote }: { quote: Quote }) {
+  const color = changeColor(quote.changePct);
+  const sign = quote.change > 0 ? "+" : "";
+  const cap = formatMarketCap(quote.marketCap);
+  return (
+    <div style={{ padding: "0 24px 8px" }}>
+      <Text typography="t1" fontWeight="bold" color={adaptive.grey900}>
+        {formatPrice(quote.price, quote.currency)}
+      </Text>
+      <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 4 }}>
+        <Text typography="t5" fontWeight="bold" color={color}>
+          {formatPct(quote.changePct)}
+        </Text>
+        <Text typography="t6" color={color}>
+          {sign}
+          {formatPrice(quote.change, quote.currency)}
+        </Text>
+      </div>
+      <Text typography="t7" color={adaptive.grey500} style={{ display: "block", marginTop: 6 }}>
+        {cap ? `시가총액 ${cap} · ` : ""}
+        {isUsMarketOpen() ? `실시간 · ${formatDateTimeKo(quote.asOf)}` : `${formatDateTimeKo(quote.asOf)} 기준`}
+      </Text>
+    </div>
   );
 }
 

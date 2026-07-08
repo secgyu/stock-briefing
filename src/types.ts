@@ -48,3 +48,12 @@ export interface SymbolInfo {
   market: Market;
   exchange: string;
 }
+
+export interface Quote {
+  price: number;
+  change: number; // 전일 대비 (통화 단위)
+  changePct: number; // 전일 대비 %
+  currency: string; // "USD"
+  marketCap?: number; // 시가총액 (단위: 백만 USD, Finnhub profile2)
+  asOf: string; // 조회 시각 ISO
+}

@@ -199,6 +199,50 @@ export async function fetchUsEarningsForSymbol(symbol: string, env: Env): Promis
   }));
 }
 
+interface FinnhubQuote {
+  c: number; // 현재가
+  d: number | null; // 전일 대비
+  dp: number | null; // 전일 대비 %
+  t: number; // 데이터 시각(unix초). 장 마감 후엔 마감 시각에 고정된다.
+}
+interface FinnhubProfile {
+  marketCapitalization?: number; // 백만 USD
+  currency?: string;
+}
+
+export interface UsQuoteCore {
+  price: number;
+  change: number;
+  changePct: number;
+  asOf: string;
+}
+
+/** 시세 코어(현재가·등락). 장중 자주 바뀌므로 짧게 캐시. 데이터 없으면 null. */
+export async function fetchUsQuoteCore(symbol: string, env: Env): Promise<UsQuoteCore | null> {
+  const q = await fetchJson<FinnhubQuote>(`/quote?symbol=${encodeURIComponent(symbol)}`, env);
+  if (!q || typeof q.c !== "number" || q.c === 0) return null; // 상장폐지·미지원 종목
+  return {
+    price: q.c,
+    change: q.d ?? 0,
+    changePct: q.dp ?? 0,
+    // 우리가 부른 시각이 아니라 시세 데이터의 실제 시각(장 마감 후엔 마감 시각).
+    asOf: new Date((q.t ? q.t : Date.now() / 1000) * 1000).toISOString(),
+  };
+}
+
+export interface UsProfile {
+  currency: string;
+  marketCap?: number; // 백만 USD
+}
+
+/** 통화·시가총액. 장중 거의 안 변하므로 길게 캐시한다. */
+export async function fetchUsProfile(symbol: string, env: Env): Promise<UsProfile> {
+  const p = await fetchJson<FinnhubProfile>(`/stock/profile2?symbol=${encodeURIComponent(symbol)}`, env).catch(
+    () => ({}) as FinnhubProfile,
+  );
+  return { currency: p.currency || "USD", marketCap: p.marketCapitalization };
+}
+
 /** 다가오는 미국 IPO. */
 export async function fetchUsIpos(env: Env): Promise<IpoEvent[]> {
   const { from, to } = window(31);

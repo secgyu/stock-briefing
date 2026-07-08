@@ -6,6 +6,8 @@ import {
   fetchUsEarningsForSymbol,
   fetchUsEarningsForSymbols,
   fetchUsIpos,
+  fetchUsProfile,
+  fetchUsQuoteCore,
   US_INFO,
   US_SYMBOLS,
 } from "./finnhub";
@@ -41,6 +43,8 @@ async function cached<T>(env: WorkerEnv, key: string, ttlSec: number, producer: 
 }
 
 const IPO_TTL = 21600; // 6h
+const QUOTE_TTL = 60; // KV 최소 TTL. 장중 클라 폴링과 맞물려 ~1분 단위 갱신
+const PROFILE_TTL = 86400; // 시총·통화는 장중 불변 → 24h
 
 // 미국 실적: 종목당 1콜이라 유니버스 전체를 한 요청에 못 부른다(외부 fetch 50개/요청 한계).
 // 25개씩 청크로 나눠 KV에 저장하고, 매 요청은 "가장 오래된 청크 1개"만 갱신한다.
@@ -119,6 +123,7 @@ const upcoming = <T extends { date: string }>(list: T[]) => list.filter((x) => d
 const ROUTES: { path: string; desc: string }[] = [
   { path: "/earnings/upcoming", desc: "다가오는 실적 발표 (전체)" },
   { path: "/earnings?symbol=AAPL", desc: "특정 종목의 실적 일정" },
+  { path: "/quote?symbol=AAPL", desc: "미국 종목 현재 시세(현재가·등락·시총)" },
   { path: "/ipo", desc: "다가오는 공모주(IPO)" },
   { path: "/sectors", desc: "산업별 주간 등락률" },
   { path: "/news", desc: "시장 뉴스 (또는 ?symbol=005930 종목 뉴스)" },
@@ -177,7 +182,8 @@ export default {
       case "/earnings/upcoming": {
         const us = await usEarnings(env);
         const kr = buildEarnings().filter((e) => e.market === "KR");
-        return json(upcoming([...us, ...kr]).slice(0, 50));
+        // 유니버스(~88) 크기로 개수가 자연히 제한돼 별도 상한 없이 90일치를 모두 노출.
+        return json(upcoming([...us, ...kr]));
       }
 
       // 특정 종목 실적 (상세 화면). ?symbol=AAPL / 국내는 mock.
@@ -197,6 +203,22 @@ export default {
               .filter((e) => e.symbol === symbol)
               .sort(byDate),
           );
+        }
+      }
+
+      // 미국 종목 현재 시세. KR은 아직 시세 소스 없음(mock) → null.
+      // 가격(코어)은 짧게(KV 하한 60s), 시총·통화(profile)는 길게 캐시해 Finnhub 콜을 아낀다.
+      case "/quote": {
+        if (!symbol || isKr(symbol)) return json(null);
+        try {
+          const [core, prof] = await Promise.all([
+            cached(env, `q:${symbol}`, QUOTE_TTL, () => fetchUsQuoteCore(symbol, env)),
+            cached(env, `p:${symbol}`, PROFILE_TTL, () => fetchUsProfile(symbol, env)),
+          ]);
+          if (!core) return json(null);
+          return json({ ...core, currency: prof?.currency ?? "USD", marketCap: prof?.marketCap });
+        } catch {
+          return json(null);
         }
       }
 
