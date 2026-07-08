@@ -3,7 +3,7 @@ import { Button, ListRow, Text, Top } from "@toss/tds-mobile";
 import { api } from "../api/client";
 import { daysUntil } from "../lib/dday";
 import { openExternal } from "../lib/external";
-import { earningsTimeLabel, formatDateKo, marketFlag } from "../lib/format";
+import { earningsTimeLabel, formatDateKo, marketFlag, marketLabel } from "../lib/format";
 import { useAsync } from "../lib/useAsync";
 import type { UseWatchlist } from "../lib/watchlist";
 import { DdayBadge, EstimatedBadge } from "../components/badges";
@@ -25,7 +25,11 @@ async function loadDetail(symbol: string): Promise<DetailData> {
   const [symbols, earnings, news] = await Promise.all([api.symbols(symbol), api.earnings(symbol), api.news(symbol)]);
   const today = new Date();
   const next = earnings.filter((e) => daysUntil(e.date, today) >= 0).sort((a, b) => a.date.localeCompare(b.date))[0];
-  return { info: symbols.find((s) => s.symbol === symbol), next, news };
+  // 종목 마스터에 없더라도 실적 데이터(심볼·이름·시장)로 최소 정보를 구성해 상세를 보여준다.
+  const found = symbols.find((s) => s.symbol === symbol);
+  const e0 = earnings[0];
+  const info = found ?? (e0 ? { symbol: e0.symbol, name: e0.name, market: e0.market, exchange: "" } : undefined);
+  return { info, next, news };
 }
 
 export function StockDetailScreen({
@@ -78,7 +82,7 @@ export function StockDetailScreen({
         title={<Top.TitleParagraph size={22}>{info.name}</Top.TitleParagraph>}
         subtitleBottom={
           <Top.SubtitleParagraph size={15}>
-            {marketFlag(info.market)} {info.symbol} · {info.exchange}
+            {marketFlag(info.market)} {info.symbol} · {info.exchange || marketLabel(info.market)}
           </Top.SubtitleParagraph>
         }
       />

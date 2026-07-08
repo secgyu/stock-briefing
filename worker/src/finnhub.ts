@@ -1,4 +1,4 @@
-import type { EarningsEvent, EarningsTime, IpoEvent } from "../../src/types";
+import type { EarningsEvent, EarningsTime, IpoEvent, SymbolInfo } from "../../src/types";
 
 export interface Env {
   FINNHUB_API_KEY: string;
@@ -106,6 +106,17 @@ const US_UNIVERSE: Record<string, string> = {
 
 /** universe 티커 목록(청크 분할용). */
 export const US_SYMBOLS = Object.keys(US_UNIVERSE);
+
+/**
+ * 종목 검색·상세용 SymbolInfo. exchange는 종목별로 미상이라 빈 값으로 두고,
+ * 프런트에서 시장명("해외")으로 대체한다. (정확한 거래소가 필요해지면 profile2로 보강)
+ */
+export const US_INFO: SymbolInfo[] = Object.entries(US_UNIVERSE).map(([symbol, name]) => ({
+  symbol,
+  name,
+  market: "US",
+  exchange: "",
+}));
 
 const pad = (n: number) => String(n).padStart(2, "0");
 const ymd = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;

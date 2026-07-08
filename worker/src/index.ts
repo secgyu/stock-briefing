@@ -1,7 +1,20 @@
 import { daysUntil } from "../../src/lib/dday";
-import type { EarningsEvent, IpoEvent } from "../../src/types";
+import type { EarningsEvent, IpoEvent, SymbolInfo } from "../../src/types";
 import { buildEarnings, buildIpos, MOCK_SECTORS, MOCK_SYMBOLS, mockNewsFor } from "../../src/mock/dummy";
-import { type Env, fetchUsEarningsForSymbol, fetchUsEarningsForSymbols, fetchUsIpos, US_SYMBOLS } from "./finnhub";
+import {
+  type Env,
+  fetchUsEarningsForSymbol,
+  fetchUsEarningsForSymbols,
+  fetchUsIpos,
+  US_INFO,
+  US_SYMBOLS,
+} from "./finnhub";
+
+// 검색·상세용 종목 마스터: KR mock + 미국 유니버스(88). 중복 심볼은 exchange가 있는 mock을 우선.
+const SYMBOL_MASTER: SymbolInfo[] = [
+  ...MOCK_SYMBOLS,
+  ...US_INFO.filter((u) => !MOCK_SYMBOLS.some((m) => m.symbol === u.symbol)),
+];
 
 // P5: 미국 실적/IPO는 Finnhub 실데이터. 국내(KR)는 아직 mock을 병합해 화면을 채운다.
 // (DART 붙일 때 KR mock만 교체) sectors/news/symbols는 아직 mock.
@@ -205,7 +218,7 @@ export default {
         return json(
           q === ""
             ? []
-            : MOCK_SYMBOLS.filter((s) => s.name.toLowerCase().includes(q) || s.symbol.toLowerCase().includes(q)).slice(
+            : SYMBOL_MASTER.filter((s) => s.name.toLowerCase().includes(q) || s.symbol.toLowerCase().includes(q)).slice(
                 0,
                 20,
               ),
