@@ -1,17 +1,17 @@
 import { adaptive } from "@toss/tds-colors";
 import { ListRow, Text, TextField, Top } from "@toss/tds-mobile";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { api } from "../api/client";
 import { ddayLabel } from "../lib/dday";
 import { marketFlag } from "../lib/format";
 import { logoCandidates } from "../lib/logo";
+import { useAsync } from "../lib/useAsync";
 import type { UseWatchlist } from "../lib/watchlist";
-import { MOCK_SYMBOLS, nextEarningsFor } from "../mock/dummy";
 import { DdayBadge } from "../components/badges";
 import { SectionCard, SectionHeader, Screen } from "../components/layout";
 import { StarToggle } from "../components/rows";
-import { EmptyState } from "../components/states";
+import { AsyncSection, EmptyState } from "../components/states";
 import { StockAvatar } from "../components/StockAvatar";
-import type { SymbolInfo } from "../types";
 
 export function WatchScreen({
   watchlist,
@@ -21,26 +21,32 @@ export function WatchScreen({
   onOpenStock: (symbol: string) => void;
 }) {
   const [query, setQuery] = useState("");
-  const q = query.trim().toLowerCase();
+  const q = query.trim();
 
-  const results = useMemo<SymbolInfo[]>(() => {
-    if (q === "") return [];
-    return MOCK_SYMBOLS.filter((s) => s.name.toLowerCase().includes(q) || s.symbol.toLowerCase().includes(q)).slice(
-      0,
-      20,
-    );
+  // 키 입력마다 워커를 때리지 않도록 250ms 디바운스.
+  const [debouncedQ, setDebouncedQ] = useState(q);
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedQ(q), 250);
+    return () => clearTimeout(t);
   }, [q]);
+
+  const search = useAsync(() => (debouncedQ === "" ? Promise.resolve([]) : api.symbols(debouncedQ)), [debouncedQ]);
+
+  // 관심종목의 "다음 실적"은 다가오는 실적 전체에서 파생한다.
+  const upcoming = useAsync(() => api.upcomingEarnings(), []);
+  const nextOf = (symbol: string) => (upcoming.data ?? []).find((e) => e.symbol === symbol);
 
   const sortedWatch = useMemo(
     () =>
       watchlist.items
-        .map((w) => ({ item: w, next: nextEarningsFor(w.symbol) }))
+        .map((w) => ({ item: w, next: nextOf(w.symbol) }))
         .sort((a, b) => {
           if (!a.next) return 1;
           if (!b.next) return -1;
           return a.next.date.localeCompare(b.next.date);
         }),
-    [watchlist.items],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [watchlist.items, upcoming.data],
   );
 
   return (
@@ -59,36 +65,41 @@ export function WatchScreen({
       {q !== "" ? (
         <SectionCard>
           <SectionHeader title="검색 결과" />
-          {results.length === 0 ? (
-            <EmptyState title="검색 결과가 없어요" description="다른 종목명이나 티커로 검색해 보세요." />
-          ) : (
-            results.map((s) => (
-              <ListRow
-                key={s.symbol}
-                onClick={() => onOpenStock(s.symbol)}
-                withTouchEffect
-                left={<StockAvatar name={s.name} seed={s.symbol} logoUrls={logoCandidates(s.symbol, s.market)} />}
-                contents={
-                  <div>
-                    <Text typography="t6" fontWeight="bold" color={adaptive.grey900}>
-                      {s.name}
-                    </Text>
-                    <div style={{ marginTop: 2 }}>
-                      <Text typography="t7" color={adaptive.grey500}>
-                        {marketFlag(s.market)} {s.symbol} · {s.exchange}
+          <AsyncSection
+            status={search.status}
+            data={search.data ?? []}
+            onRetry={search.retry}
+            empty={<EmptyState title="검색 결과가 없어요" description="다른 종목명이나 티커로 검색해 보세요." />}
+          >
+            {(list) =>
+              list.map((s) => (
+                <ListRow
+                  key={s.symbol}
+                  onClick={() => onOpenStock(s.symbol)}
+                  withTouchEffect
+                  left={<StockAvatar name={s.name} seed={s.symbol} logoUrls={logoCandidates(s.symbol, s.market)} />}
+                  contents={
+                    <div>
+                      <Text typography="t6" fontWeight="bold" color={adaptive.grey900}>
+                        {s.name}
                       </Text>
+                      <div style={{ marginTop: 2 }}>
+                        <Text typography="t7" color={adaptive.grey500}>
+                          {marketFlag(s.market)} {s.symbol} · {s.exchange}
+                        </Text>
+                      </div>
                     </div>
-                  </div>
-                }
-                right={
-                  <StarToggle
-                    on={watchlist.isWatched(s.symbol)}
-                    onClick={() => watchlist.toggle({ symbol: s.symbol, name: s.name, market: s.market })}
-                  />
-                }
-              />
-            ))
-          )}
+                  }
+                  right={
+                    <StarToggle
+                      on={watchlist.isWatched(s.symbol)}
+                      onClick={() => watchlist.toggle({ symbol: s.symbol, name: s.name, market: s.market })}
+                    />
+                  }
+                />
+              ))
+            }
+          </AsyncSection>
         </SectionCard>
       ) : (
         <SectionCard>

@@ -1,9 +1,9 @@
 import { Text, Top } from "@toss/tds-mobile";
+import { api } from "../api/client";
 import { daysUntil } from "../lib/dday";
 import { openExternal } from "../lib/external";
-import { useAsyncMock } from "../lib/useAsyncMock";
+import { useAsync } from "../lib/useAsync";
 import type { UseWatchlist } from "../lib/watchlist";
-import { MOCK_EARNINGS, MOCK_IPOS, MOCK_MARKET_NEWS, MOCK_SECTORS, nextEarningsFor } from "../mock/dummy";
 import { DisclaimerFooter } from "../components/DisclaimerFooter";
 import { SectionCard, SectionHeader, Screen } from "../components/layout";
 import { EarningsRow, IpoRow, NewsRow, SectorRow } from "../components/rows";
@@ -17,6 +17,7 @@ interface HomeData {
   news: NewsItem[];
   earningsThisWeek: number;
   iposThisWeek: number;
+  allUpcoming: EarningsEvent[]; // 관심종목의 다음 실적을 파생하는 원본(미래 실적 전체)
 }
 
 const withinWeek = (date: string, today: Date) => {
@@ -24,19 +25,25 @@ const withinWeek = (date: string, today: Date) => {
   return d >= 0 && d <= 7;
 };
 
-function loadHome(): HomeData {
+/** upcoming은 미래·오름차순 정렬이므로 심볼의 첫 매치가 곧 다음 실적. */
+const nextEarningsFrom = (list: EarningsEvent[], symbol: string) => list.find((e) => e.symbol === symbol);
+
+async function loadHome(): Promise<HomeData> {
+  const [upcoming, ipos, sectors, news] = await Promise.all([
+    api.upcomingEarnings(),
+    api.ipos(),
+    api.sectors(),
+    api.news(),
+  ]);
   const today = new Date();
   return {
-    upcoming: MOCK_EARNINGS.filter((e) => daysUntil(e.date, today) >= 0)
-      .sort((a, b) => a.date.localeCompare(b.date))
-      .slice(0, 5),
-    ipos: MOCK_IPOS.filter((i) => daysUntil(i.date, today) >= 0)
-      .sort((a, b) => a.date.localeCompare(b.date))
-      .slice(0, 5),
-    sectors: MOCK_SECTORS.slice(0, 5),
-    news: MOCK_MARKET_NEWS.slice(0, 5),
-    earningsThisWeek: MOCK_EARNINGS.filter((e) => withinWeek(e.date, today)).length,
-    iposThisWeek: MOCK_IPOS.filter((i) => withinWeek(i.date, today)).length,
+    upcoming: upcoming.slice(0, 5),
+    ipos: ipos.slice(0, 5),
+    sectors: sectors.slice(0, 5),
+    news: news.slice(0, 5),
+    earningsThisWeek: upcoming.filter((e) => withinWeek(e.date, today)).length,
+    iposThisWeek: ipos.filter((i) => withinWeek(i.date, today)).length,
+    allUpcoming: upcoming,
   };
 }
 
@@ -71,10 +78,10 @@ export function HomeScreen({
   onGoWatch: () => void;
   onGoCalendar: () => void;
 }) {
-  const { status, data, retry } = useAsyncMock(loadHome);
+  const { status, data, retry } = useAsync(loadHome);
 
   const watched = watchlist.items
-    .map((w) => ({ item: w, next: nextEarningsFor(w.symbol) }))
+    .map((w) => ({ item: w, next: nextEarningsFrom(data?.allUpcoming ?? [], w.symbol) }))
     .sort((a, b) => {
       if (!a.next) return 1;
       if (!b.next) return -1;
@@ -89,7 +96,7 @@ export function HomeScreen({
 
       <SectionCard>
         <SectionHeader title="내 관심종목" moreLabel="관심 관리" onMore={onGoWatch} />
-        {!watchlist.loaded ? (
+        {!watchlist.loaded || status === "loading" ? (
           <ListSkeleton rows={2} />
         ) : watched.length === 0 ? (
           <EmptyState

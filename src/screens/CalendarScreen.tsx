@@ -1,10 +1,10 @@
 import { adaptive } from "@toss/tds-colors";
 import { Tab, Text, Top } from "@toss/tds-mobile";
 import { useMemo, useState } from "react";
+import { api } from "../api/client";
 import { formatDateKo } from "../lib/format";
-import { useAsyncMock } from "../lib/useAsyncMock";
+import { useAsync } from "../lib/useAsync";
 import type { UseWatchlist } from "../lib/watchlist";
-import { MOCK_EARNINGS, MOCK_IPOS } from "../mock/dummy";
 import { SectionCard, Screen } from "../components/layout";
 import { EarningsRow, IpoRow } from "../components/rows";
 import { AsyncSection, EmptyState } from "../components/states";
@@ -43,10 +43,10 @@ export function CalendarScreen({
   const [filterIndex, setFilterIndex] = useState(0);
   const market = MARKET_BY_INDEX[filterIndex];
 
-  const { status, data, retry } = useAsyncMock<CalendarData>(() => ({
-    earnings: MOCK_EARNINGS,
-    ipos: MOCK_IPOS,
-  }));
+  const { status, data, retry } = useAsync<CalendarData>(async () => {
+    const [earnings, ipos] = await Promise.all([api.upcomingEarnings(), api.ipos()]);
+    return { earnings, ipos };
+  });
 
   const weekDays = useMemo(
     () =>

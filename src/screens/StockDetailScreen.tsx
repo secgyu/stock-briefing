@@ -1,16 +1,32 @@
 import { adaptive } from "@toss/tds-colors";
 import { Button, ListRow, Text, Top } from "@toss/tds-mobile";
+import { api } from "../api/client";
+import { daysUntil } from "../lib/dday";
 import { openExternal } from "../lib/external";
 import { earningsTimeLabel, formatDateKo, marketFlag } from "../lib/format";
+import { useAsync } from "../lib/useAsync";
 import type { UseWatchlist } from "../lib/watchlist";
-import { MOCK_SYMBOLS, mockNewsFor, nextEarningsFor } from "../mock/dummy";
 import { DdayBadge, EstimatedBadge } from "../components/badges";
 import { SectionCard, SectionHeader, Screen } from "../components/layout";
 import { NewsRow } from "../components/rows";
-import { EmptyState } from "../components/states";
+import { EmptyState, ErrorState, ListSkeleton } from "../components/states";
 import { ChevronRightIcon } from "../components/icons";
+import type { EarningsEvent, NewsItem, SymbolInfo } from "../types";
 
 const DART_SEARCH = "https://dart.fss.or.kr/dsab007/main.do";
+
+interface DetailData {
+  info?: SymbolInfo;
+  next?: EarningsEvent;
+  news: NewsItem[];
+}
+
+async function loadDetail(symbol: string): Promise<DetailData> {
+  const [symbols, earnings, news] = await Promise.all([api.symbols(symbol), api.earnings(symbol), api.news(symbol)]);
+  const today = new Date();
+  const next = earnings.filter((e) => daysUntil(e.date, today) >= 0).sort((a, b) => a.date.localeCompare(b.date))[0];
+  return { info: symbols.find((s) => s.symbol === symbol), next, news };
+}
 
 export function StockDetailScreen({
   symbol,
@@ -21,10 +37,30 @@ export function StockDetailScreen({
   watchlist: UseWatchlist;
   onBack: () => void;
 }) {
-  const info = MOCK_SYMBOLS.find((s) => s.symbol === symbol);
-  const next = nextEarningsFor(symbol);
-  const news = mockNewsFor(symbol);
+  const { status, data, retry } = useAsync(() => loadDetail(symbol), [symbol]);
   const watched = watchlist.isWatched(symbol);
+
+  if (status === "loading") {
+    return (
+      <Screen>
+        <BackBar onBack={onBack} />
+        <ListSkeleton rows={4} />
+      </Screen>
+    );
+  }
+
+  if (status === "error") {
+    return (
+      <Screen>
+        <BackBar onBack={onBack} />
+        <ErrorState onRetry={retry} />
+      </Screen>
+    );
+  }
+
+  const info = data?.info;
+  const next = data?.next;
+  const news = data?.news ?? [];
 
   if (!info) {
     return (
