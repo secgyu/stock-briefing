@@ -22,6 +22,50 @@ function json(data: unknown): Response {
 const byDate = <T extends { date: string }>(a: T, b: T) => a.date.localeCompare(b.date);
 const upcoming = <T extends { date: string }>(list: T[]) => list.filter((x) => daysUntil(x.date) >= 0).sort(byDate);
 
+/** `/` 안내 페이지용 엔드포인트 목록. 실제 라우트와 한 곳에서 관리한다. */
+const ROUTES: { path: string; desc: string }[] = [
+  { path: "/earnings/upcoming", desc: "다가오는 실적 발표 (전체)" },
+  { path: "/earnings?symbol=AAPL", desc: "특정 종목의 실적 일정" },
+  { path: "/ipo", desc: "다가오는 공모주(IPO)" },
+  { path: "/sectors", desc: "산업별 주간 등락률" },
+  { path: "/news", desc: "시장 뉴스 (또는 ?symbol=005930 종목 뉴스)" },
+  { path: "/symbols?q=삼성", desc: "종목 검색" },
+];
+
+const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]!);
+
+/** 엔드포인트 목록 안내 HTML */
+function indexHtml(): Response {
+  const rows = ROUTES.map(
+    (r) =>
+      `<li><a href="${esc(r.path)}"><span class="m">GET</span> <code>${esc(r.path)}</code></a><span class="d">${esc(r.desc)}</span></li>`,
+  ).join("");
+  const body = `<!doctype html><html lang="ko"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>stock-briefing-api</title>
+<style>
+:root{color-scheme:dark}
+body{margin:0;background:#0f1115;color:#e6e6e6;font:15px/1.6 -apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo",sans-serif;padding:40px 20px}
+.wrap{max-width:640px;margin:0 auto}
+h1{font-size:20px;margin:0 0 4px}
+.sub{color:#8b8f98;font-size:13px;margin:0 0 24px}
+ul{list-style:none;padding:0;margin:0}
+li{padding:14px 16px;border:1px solid #23262d;border-radius:12px;margin-bottom:10px;background:#161a20}
+a{text-decoration:none;color:#e6e6e6;display:flex;align-items:center;gap:8px}
+a:hover code{color:#4b9fff}
+.m{font-size:11px;font-weight:700;color:#3fb950;border:1px solid #2a4d33;border-radius:6px;padding:1px 6px}
+code{color:#cdd3dc;font:13px/1 ui-monospace,SFMono-Regular,Menlo,monospace}
+.d{display:block;color:#8b8f98;font-size:13px;margin-top:6px}
+footer{color:#5c616b;font-size:12px;margin-top:24px}
+</style></head><body><div class="wrap">
+<h1>📈 stock-briefing-api</h1>
+<p class="sub">주식 브리핑 미니앱 백엔드 · 아래 경로를 눌러 응답을 확인하세요.</p>
+<ul>${rows}</ul>
+<footer>모든 응답은 <code>{ updatedAt, data }</code> 형식입니다.</footer>
+</div></body></html>`;
+  return new Response(body, { headers: { "Content-Type": "text/html; charset=utf-8", ...CORS } });
+}
+
 export default {
   fetch(req: Request): Response {
     if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: CORS });
@@ -34,7 +78,7 @@ export default {
 
     switch (path) {
       case "/":
-        return json({ ok: true, service: "stock-briefing-api" });
+        return indexHtml();
 
       case "/earnings/upcoming":
         return json(upcoming(buildEarnings()).slice(0, 50));
