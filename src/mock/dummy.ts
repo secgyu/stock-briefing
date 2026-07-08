@@ -89,13 +89,20 @@ export function buildIpos(): IpoEvent[] {
 }
 export const MOCK_IPOS: IpoEvent[] = buildIpos();
 
+// rank는 화면에서 시장별로 다시 매기므로 여기 값은 참고용이다.
 export const MOCK_SECTORS: SectorRank[] = [
   { rank: 1, name: "조선", market: "KR", weeklyChangePct: 5.1 },
   { rank: 2, name: "반도체", market: "KR", weeklyChangePct: 4.2 },
-  { rank: 3, name: "Technology", market: "US", weeklyChangePct: 3.1 },
+  { rank: 3, name: "방산", market: "KR", weeklyChangePct: 3.8 },
   { rank: 4, name: "자동차", market: "KR", weeklyChangePct: 2.3 },
   { rank: 5, name: "바이오", market: "KR", weeklyChangePct: 0.8 },
   { rank: 6, name: "2차전지", market: "KR", weeklyChangePct: -1.1 },
+  { rank: 1, name: "Technology", market: "US", weeklyChangePct: 3.1 },
+  { rank: 2, name: "Semiconductors", market: "US", weeklyChangePct: 2.6 },
+  { rank: 3, name: "Consumer Discretionary", market: "US", weeklyChangePct: 1.8 },
+  { rank: 4, name: "Communication", market: "US", weeklyChangePct: 1.4 },
+  { rank: 5, name: "Financials", market: "US", weeklyChangePct: 0.9 },
+  { rank: 6, name: "Health Care", market: "US", weeklyChangePct: -0.5 },
   { rank: 7, name: "Energy", market: "US", weeklyChangePct: -2.4 },
 ];
 

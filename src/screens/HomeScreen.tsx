@@ -1,14 +1,16 @@
+import { useState } from "react";
+import { adaptive } from "@toss/tds-colors";
 import { Text, Top } from "@toss/tds-mobile";
 import { api } from "../api/client";
 import { daysUntil } from "../lib/dday";
 import { openExternal } from "../lib/external";
-import { useAsync } from "../lib/useAsync";
+import { type AsyncStatus, useAsync } from "../lib/useAsync";
 import type { UseWatchlist } from "../lib/watchlist";
 import { DisclaimerFooter } from "../components/DisclaimerFooter";
 import { SectionCard, SectionHeader, Screen } from "../components/layout";
 import { EarningsRow, IpoRow, NewsRow, SectorRow } from "../components/rows";
 import { AsyncSection, EmptyState, ListSkeleton } from "../components/states";
-import type { EarningsEvent, IpoEvent, NewsItem, SectorRank } from "../types";
+import type { EarningsEvent, IpoEvent, Market, NewsItem, SectorRank } from "../types";
 
 interface HomeData {
   upcoming: EarningsEvent[];
@@ -38,8 +40,8 @@ async function loadHome(): Promise<HomeData> {
   const today = new Date();
   return {
     upcoming: upcoming.slice(0, 5),
-    ipos: ipos.slice(0, 5),
-    sectors: sectors.slice(0, 5),
+    ipos, // 국내/해외 탭에서 각각 임박 순으로 뽑으므로 전체를 넘긴다
+    sectors, // 국내/해외 탭에서 각각 상위를 뽑으므로 전체를 넘긴다
     news: news.slice(0, 5),
     earningsThisWeek: upcoming.filter((e) => withinWeek(e.date, today)).length,
     iposThisWeek: ipos.filter((i) => withinWeek(i.date, today)).length,
@@ -64,6 +66,100 @@ function HomeHero({ earnings, ipos }: { earnings: number; ipos: number }) {
         </Text>
       </div>
     </div>
+  );
+}
+
+/** 국내/해외 토글. 활성 탭은 브랜드 블루 알약. */
+function MarketTabs({ value, onChange }: { value: Market; onChange: (m: Market) => void }) {
+  const tabs: { id: Market; label: string }[] = [
+    { id: "KR", label: "국내" },
+    { id: "US", label: "해외" },
+  ];
+  return (
+    <div style={{ display: "flex", gap: 6, padding: "2px 20px 8px" }}>
+      {tabs.map((t) => {
+        const active = value === t.id;
+        return (
+          <button
+            key={t.id}
+            type="button"
+            onClick={() => onChange(t.id)}
+            style={{
+              border: "none",
+              cursor: "pointer",
+              borderRadius: 999,
+              padding: "6px 16px",
+              fontSize: 13,
+              fontWeight: 700,
+              background: active ? "#3182F6" : adaptive.grey100,
+              color: active ? "#FFFFFF" : adaptive.grey600,
+            }}
+          >
+            {t.label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+/** "지금 뜨는 산업": 국내/해외 탭으로 분리, 탭별 상위 5개를 등락률순으로. */
+function TrendingSectors({
+  status,
+  sectors,
+  onRetry,
+}: {
+  status: AsyncStatus;
+  sectors: SectorRank[];
+  onRetry: () => void;
+}) {
+  const [tab, setTab] = useState<Market>("KR");
+  const list = sectors
+    .filter((s) => s.market === tab)
+    .sort((a, b) => b.weeklyChangePct - a.weeklyChangePct)
+    .slice(0, 5)
+    .map((s, i) => ({ ...s, rank: i + 1 }));
+  return (
+    <SectionCard>
+      <SectionHeader title="지금 뜨는 산업" caption="객관적 지표(주간 등락률) 기준이에요" />
+      <MarketTabs value={tab} onChange={setTab} />
+      <AsyncSection status={status} data={list} onRetry={onRetry} empty={<EmptyState title="집계된 지표가 없어요" />}>
+        {(rows) => {
+          const maxAbs = Math.max(0, ...rows.map((s) => Math.abs(s.weeklyChangePct)));
+          return rows.map((s) => <SectorRow key={`${s.market}-${s.name}`} sector={s} maxAbs={maxAbs} />);
+        }}
+      </AsyncSection>
+    </SectionCard>
+  );
+}
+
+/** "오늘·이번주 상장": 국내/해외 탭으로 분리, 탭별 임박 5건. */
+function IpoSection({
+  status,
+  ipos,
+  onRetry,
+  onMore,
+}: {
+  status: AsyncStatus;
+  ipos: IpoEvent[];
+  onRetry: () => void;
+  onMore: () => void;
+}) {
+  const [tab, setTab] = useState<Market>("KR");
+  const list = ipos.filter((i) => i.market === tab).slice(0, 5);
+  return (
+    <SectionCard>
+      <SectionHeader title="오늘·이번주 상장" moreLabel="더 보기" onMore={onMore} />
+      <MarketTabs value={tab} onChange={setTab} />
+      <AsyncSection
+        status={status}
+        data={list}
+        onRetry={onRetry}
+        empty={<EmptyState title="예정된 상장 일정이 없어요" />}
+      >
+        {(rows) => rows.map((i) => <IpoRow key={`${i.name}-${i.date}`} ipo={i} />)}
+      </AsyncSection>
+    </SectionCard>
   );
 }
 
@@ -142,32 +238,9 @@ export function HomeScreen({
         </AsyncSection>
       </SectionCard>
 
-      <SectionCard>
-        <SectionHeader title="오늘·이번주 상장" moreLabel="더 보기" onMore={onGoCalendar} />
-        <AsyncSection
-          status={status}
-          data={data?.ipos ?? []}
-          onRetry={retry}
-          empty={<EmptyState title="예정된 상장 일정이 없어요" />}
-        >
-          {(list) => list.map((i) => <IpoRow key={`${i.name}-${i.date}`} ipo={i} />)}
-        </AsyncSection>
-      </SectionCard>
+      <IpoSection status={status} ipos={data?.ipos ?? []} onRetry={retry} onMore={onGoCalendar} />
 
-      <SectionCard>
-        <SectionHeader title="지금 뜨는 산업" caption="객관적 지표(주간 등락률) 기준이에요" />
-        <AsyncSection
-          status={status}
-          data={data?.sectors ?? []}
-          onRetry={retry}
-          empty={<EmptyState title="집계된 지표가 없어요" />}
-        >
-          {(list) => {
-            const maxAbs = Math.max(0, ...list.map((s) => Math.abs(s.weeklyChangePct)));
-            return list.map((s) => <SectorRow key={`${s.market}-${s.name}`} sector={s} maxAbs={maxAbs} />);
-          }}
-        </AsyncSection>
-      </SectionCard>
+      <TrendingSectors status={status} sectors={data?.sectors ?? []} onRetry={retry} />
 
       <SectionCard>
         <SectionHeader title="주요 뉴스" />
