@@ -1,4 +1,4 @@
-import type { Disclosure, EarningsEvent, IpoEvent, NewsItem, Quote, SectorRank, SymbolInfo } from "../types";
+import type { Disclosure, EarningsEvent, IpoEvent, NewsItem, Quote, SymbolInfo } from "../types";
 
 // 배포된 Worker. 로컬 워커로 붙일 땐 이 한 줄만 바꾸면 된다(예: http://127.0.0.1:8787).
 // ponytail: 환경변수 스위칭은 필요해지면 도입. 지금은 상수 하나로 충분.
@@ -18,7 +18,6 @@ export const api = {
   upcomingEarnings: () => get<EarningsEvent[]>("/earnings/upcoming"),
   earnings: (symbol: string) => get<EarningsEvent[]>(`/earnings?symbol=${qs(symbol)}`),
   ipos: () => get<IpoEvent[]>("/ipo"),
-  sectors: () => get<SectorRank[]>("/sectors"),
   news: (symbol?: string) => get<NewsItem[]>(symbol ? `/news?symbol=${qs(symbol)}` : "/news"),
   symbols: (q: string) => get<SymbolInfo[]>(`/symbols?q=${qs(q)}`),
   quote: (symbol: string) => get<Quote | null>(`/quote?symbol=${qs(symbol)}`),

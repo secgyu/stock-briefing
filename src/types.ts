@@ -20,13 +20,6 @@ export interface IpoEvent {
   isEstimated: boolean;
 }
 
-export interface SectorRank {
-  rank: number;
-  name: string;
-  market: Market;
-  weeklyChangePct: number;
-}
-
 export interface NewsItem {
   title: string;
   source: string;

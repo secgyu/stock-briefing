@@ -1,6 +1,6 @@
 import { daysUntil } from "../../src/lib/dday";
 import type { EarningsEvent, IpoEvent, SymbolInfo } from "../../src/types";
-import { buildEarnings, buildIpos, MOCK_SECTORS, MOCK_SYMBOLS, mockNewsFor } from "../../src/mock/dummy";
+import { MOCK_SYMBOLS } from "../../src/mock/dummy";
 import {
   type Env,
   fetchUsEarningsForSymbol,
@@ -21,10 +21,8 @@ const SYMBOL_MASTER: SymbolInfo[] = [
   ...US_INFO.filter((u) => !MOCK_SYMBOLS.some((m) => m.symbol === u.symbol)),
 ];
 
-// P5: 미국 실적/IPO는 Finnhub 실데이터. 국내(KR)는 아직 mock을 병합해 화면을 채운다.
-// (DART 붙일 때 KR mock만 교체) sectors/news/symbols는 아직 mock.
-// 상대 날짜 mock은 반드시 builder(buildEarnings 등)를 요청 시점에 호출한다.
-// Workers는 모듈 로드 시 new Date()=epoch(0)이라 eager 상수를 쓰면 날짜가 1970이 된다.
+// 실적/IPO는 미국(Finnhub)만 실데이터로 제공한다. 국내는 무료 실소스가 없어 노출하지 않는다(빈 배열).
+// 시세=국내 금융위 종가/미국 Finnhub, 뉴스=네이버, 공시=DART. 모두 실데이터.
 
 interface WorkerEnv extends Env, NaverEnv, DartEnv, KrxEnv {
   CACHE: KVNamespace;
@@ -77,7 +75,7 @@ function usChunks(): string[][] {
   return out;
 }
 
-/** 청크 회전 캐시로 미국 실적을 모은다. Finnhub 실패·완전 콜드면 mock US로 폴백. */
+/** 청크 회전 캐시로 미국 실적을 모은다. Finnhub 실패·완전 콜드면 빈 배열. */
 async function usEarnings(env: WorkerEnv): Promise<EarningsEvent[]> {
   const chunks = usChunks();
   const cells = await Promise.all(chunks.map((_, i) => env.CACHE.get<ChunkCell>(`earn:${CHUNK_KEY_VER}:${i}`, "json")));
@@ -104,15 +102,14 @@ async function usEarnings(env: WorkerEnv): Promise<EarningsEvent[]> {
     }
   }
 
-  const merged = cells.flatMap((c) => c?.data ?? []);
-  return merged.length > 0 ? merged : buildEarnings().filter((e) => e.market === "US");
+  return cells.flatMap((c) => c?.data ?? []);
 }
 
 async function usIpos(env: WorkerEnv): Promise<IpoEvent[]> {
   try {
     return await cached(env, "us-ipos", IPO_TTL, () => fetchUsIpos(env));
   } catch {
-    return buildIpos().filter((i) => i.market === "US");
+    return [];
   }
 }
 
@@ -138,7 +135,6 @@ const ROUTES: { path: string; desc: string }[] = [
   { path: "/earnings?symbol=AAPL", desc: "특정 종목의 실적 일정" },
   { path: "/quote?symbol=AAPL", desc: "종목 시세(미국=실시간 근사, 국내=전일 종가)" },
   { path: "/ipo", desc: "다가오는 공모주(IPO)" },
-  { path: "/sectors", desc: "산업별 주간 등락률" },
   { path: "/news", desc: "시장 뉴스 (또는 ?symbol=005930 종목 뉴스)" },
   { path: "/disclosures?symbol=005930", desc: "국내 종목 최근 공시 (DART)" },
   { path: "/symbols?q=삼성", desc: "종목 검색" },
@@ -192,31 +188,19 @@ export default {
       case "/":
         return indexHtml();
 
-      // 미국(Finnhub 실데이터) + 국내(mock) 병합 후 임박순.
+      // 미국(Finnhub 실데이터)만. 국내 실적은 무료 실소스가 없어 미노출.
       case "/earnings/upcoming": {
-        const us = await usEarnings(env);
-        const kr = buildEarnings().filter((e) => e.market === "KR");
         // 유니버스(~88) 크기로 개수가 자연히 제한돼 별도 상한 없이 90일치를 모두 노출.
-        return json(upcoming([...us, ...kr]));
+        return json(upcoming(await usEarnings(env)));
       }
 
-      // 특정 종목 실적 (상세 화면). ?symbol=AAPL / 국내는 mock.
+      // 특정 종목 실적 (상세 화면). 미국만 실데이터, 국내는 빈 배열.
       case "/earnings": {
-        if (!symbol) return json([]);
-        if (isKr(symbol))
-          return json(
-            buildEarnings()
-              .filter((e) => e.symbol === symbol)
-              .sort(byDate),
-          );
+        if (!symbol || isKr(symbol)) return json([]);
         try {
           return json((await fetchUsEarningsForSymbol(symbol, env)).sort(byDate));
         } catch {
-          return json(
-            buildEarnings()
-              .filter((e) => e.symbol === symbol)
-              .sort(byDate),
-          );
+          return json([]);
         }
       }
 
@@ -243,16 +227,11 @@ export default {
         }
       }
 
-      case "/ipo": {
-        const us = await usIpos(env);
-        const kr = buildIpos().filter((i) => i.market === "KR");
-        return json(upcoming([...us, ...kr]).slice(0, 50));
-      }
+      // 미국(Finnhub 실데이터)만. 국내 IPO는 무료 실소스가 없어 미노출.
+      case "/ipo":
+        return json(upcoming(await usIpos(env)).slice(0, 50));
 
-      case "/sectors":
-        return json(MOCK_SECTORS);
-
-      // 종목 뉴스(?symbol=) 없으면 시장 뉴스. 네이버 검색 API, 실패/키미설정 시 mock 폴백.
+      // 종목 뉴스(?symbol=) 없으면 시장 뉴스. 네이버 검색 API, 실패 시 빈 배열.
       case "/news": {
         try {
           return json(
@@ -261,7 +240,7 @@ export default {
             ),
           );
         } catch {
-          return json(mockNewsFor(symbol));
+          return json([]);
         }
       }
 

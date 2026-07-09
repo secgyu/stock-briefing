@@ -9,14 +9,13 @@ import { type AsyncStatus, queryStatus } from "../lib/queryClient";
 import type { UseWatchlist } from "../lib/watchlist";
 import { DisclaimerFooter } from "../components/DisclaimerFooter";
 import { SectionCard, SectionHeader, Screen } from "../components/layout";
-import { EarningsRow, IpoRow, NewsRow, SectorRow } from "../components/rows";
+import { EarningsRow, IpoRow, NewsRow } from "../components/rows";
 import { AsyncSection, EmptyState, ListSkeleton } from "../components/states";
-import type { EarningsEvent, IpoEvent, Market, NewsItem, SectorRank } from "../types";
+import type { EarningsEvent, IpoEvent, Market, NewsItem } from "../types";
 
 interface HomeData {
   upcoming: EarningsEvent[];
   ipos: IpoEvent[];
-  sectors: SectorRank[];
   news: NewsItem[];
   earningsThisWeek: number;
   iposThisWeek: number;
@@ -32,17 +31,11 @@ const withinWeek = (date: string, today: Date) => {
 const nextEarningsFrom = (list: EarningsEvent[], symbol: string) => list.find((e) => e.symbol === symbol);
 
 async function loadHome(): Promise<HomeData> {
-  const [upcoming, ipos, sectors, news] = await Promise.all([
-    api.upcomingEarnings(),
-    api.ipos(),
-    api.sectors(),
-    api.news(),
-  ]);
+  const [upcoming, ipos, news] = await Promise.all([api.upcomingEarnings(), api.ipos(), api.news()]);
   const today = new Date();
   return {
     upcoming: upcoming.slice(0, 5),
     ipos, // 국내/해외 탭에서 각각 임박 순으로 뽑으므로 전체를 넘긴다
-    sectors, // 국내/해외 탭에서 각각 상위를 뽑으므로 전체를 넘긴다
     news: news.slice(0, 5),
     earningsThisWeek: upcoming.filter((e) => withinWeek(e.date, today)).length,
     iposThisWeek: ipos.filter((i) => withinWeek(i.date, today)).length,
@@ -101,36 +94,6 @@ function MarketTabs({ value, onChange }: { value: Market; onChange: (m: Market) 
         );
       })}
     </div>
-  );
-}
-
-/** "지금 뜨는 산업": 국내/해외 탭으로 분리, 탭별 상위 5개를 등락률순으로. */
-function TrendingSectors({
-  status,
-  sectors,
-  onRetry,
-}: {
-  status: AsyncStatus;
-  sectors: SectorRank[];
-  onRetry: () => void;
-}) {
-  const [tab, setTab] = useState<Market>("KR");
-  const list = sectors
-    .filter((s) => s.market === tab)
-    .sort((a, b) => b.weeklyChangePct - a.weeklyChangePct)
-    .slice(0, 5)
-    .map((s, i) => ({ ...s, rank: i + 1 }));
-  return (
-    <SectionCard>
-      <SectionHeader title="지금 뜨는 산업" caption="객관적 지표(주간 등락률) 기준이에요" />
-      <MarketTabs value={tab} onChange={setTab} />
-      <AsyncSection status={status} data={list} onRetry={onRetry} empty={<EmptyState title="집계된 지표가 없어요" />}>
-        {(rows) => {
-          const maxAbs = Math.max(0, ...rows.map((s) => Math.abs(s.weeklyChangePct)));
-          return rows.map((s) => <SectorRow key={`${s.market}-${s.name}`} sector={s} maxAbs={maxAbs} />);
-        }}
-      </AsyncSection>
-    </SectionCard>
   );
 }
 
@@ -243,8 +206,6 @@ export function HomeScreen({
       </SectionCard>
 
       <IpoSection status={status} ipos={data?.ipos ?? []} onRetry={retry} onMore={onGoCalendar} />
-
-      <TrendingSectors status={status} sectors={data?.sectors ?? []} onRetry={retry} />
 
       <SectionCard>
         <SectionHeader title="주요 뉴스" />
