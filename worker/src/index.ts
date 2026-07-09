@@ -12,8 +12,9 @@ import {
   US_SYMBOLS,
 } from "./finnhub";
 import { fetchNaverNews, type NaverEnv } from "./naver";
-import { type DartEnv, fetchKrDisclosures } from "./dart";
+import { type DartEnv, fetchKrDisclosures, KR_CORP } from "./dart";
 import { fetchKrQuote, type KrxEnv } from "./krx";
+import { fetchKrEarnings, type YahooEnv } from "./yahoo";
 
 // 검색·상세용 종목 마스터: KR mock + 미국 유니버스(88). 중복 심볼은 exchange가 있는 mock을 우선.
 const SYMBOL_MASTER: SymbolInfo[] = [
@@ -21,10 +22,10 @@ const SYMBOL_MASTER: SymbolInfo[] = [
   ...US_INFO.filter((u) => !MOCK_SYMBOLS.some((m) => m.symbol === u.symbol)),
 ];
 
-// 실적/IPO는 미국(Finnhub)만 실데이터로 제공한다. 국내는 무료 실소스가 없어 노출하지 않는다(빈 배열).
-// 시세=국내 금융위 종가/미국 Finnhub, 뉴스=네이버, 공시=DART. 모두 실데이터.
+// 실데이터 소스: 미국 실적/IPO/시세=Finnhub, 국내 실적=Yahoo(비공식), 국내 시세=금융위 종가,
+// 뉴스=네이버, 공시=DART. 국내 IPO/섹터는 무료 실소스가 없어 미노출.
 
-interface WorkerEnv extends Env, NaverEnv, DartEnv, KrxEnv {
+interface WorkerEnv extends Env, NaverEnv, DartEnv, KrxEnv, YahooEnv {
   CACHE: KVNamespace;
 }
 
@@ -44,6 +45,7 @@ async function cached<T>(env: WorkerEnv, key: string, ttlSec: number, producer: 
 }
 
 const IPO_TTL = 21600; // 6h
+const KR_EARN_TTL = 21600; // 국내 실적일 6h (실적일은 자주 안 바뀜 + Yahoo 호출 절약)
 const QUOTE_TTL = 60; // KV 최소 TTL. 장중 클라 폴링과 맞물려 ~1분 단위 갱신
 const PROFILE_TTL = 86400; // 시총·통화는 장중 불변 → 24h
 const KR_QUOTE_TTL = 3600; // 국내 종가(일별). 하루 1회 갱신이라 1h면 충분
@@ -108,6 +110,15 @@ async function usEarnings(env: WorkerEnv): Promise<EarningsEvent[]> {
 async function usIpos(env: WorkerEnv): Promise<IpoEvent[]> {
   try {
     return await cached(env, "us-ipos", IPO_TTL, () => fetchUsIpos(env));
+  } catch {
+    return [];
+  }
+}
+
+/** 국내 유니버스(KR_CORP)의 다음 실적 발표일. Yahoo 실패 시 빈 배열. */
+async function krEarnings(env: WorkerEnv): Promise<EarningsEvent[]> {
+  try {
+    return await cached(env, "kr-earn:v4", KR_EARN_TTL, () => fetchKrEarnings(Object.keys(KR_CORP), env));
   } catch {
     return [];
   }
@@ -188,15 +199,22 @@ export default {
       case "/":
         return indexHtml();
 
-      // 미국(Finnhub 실데이터)만. 국내 실적은 무료 실소스가 없어 미노출.
+      // 미국(Finnhub) + 국내(Yahoo) 실적을 병합해 임박순.
       case "/earnings/upcoming": {
-        // 유니버스(~88) 크기로 개수가 자연히 제한돼 별도 상한 없이 90일치를 모두 노출.
-        return json(upcoming(await usEarnings(env)));
+        const [us, kr] = await Promise.all([usEarnings(env), krEarnings(env)]);
+        return json(upcoming([...us, ...kr]));
       }
 
-      // 특정 종목 실적 (상세 화면). 미국만 실데이터, 국내는 빈 배열.
+      // 특정 종목 실적 (상세 화면). 국내=Yahoo, 미국=Finnhub.
       case "/earnings": {
-        if (!symbol || isKr(symbol)) return json([]);
+        if (!symbol) return json([]);
+        if (isKr(symbol)) {
+          try {
+            return json(await cached(env, `kre3:${symbol}`, KR_EARN_TTL, () => fetchKrEarnings([symbol], env)));
+          } catch {
+            return json([]);
+          }
+        }
         try {
           return json((await fetchUsEarningsForSymbol(symbol, env)).sort(byDate));
         } catch {
