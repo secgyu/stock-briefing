@@ -70,7 +70,8 @@ export function StockDetailScreen({
     queryKey: ["quote", symbol],
     queryFn: () => api.quote(symbol),
     staleTime: 0, // 재진입·포커스 복귀 때 항상 최신 시세로
-    refetchInterval: () => (isUsMarketOpen() ? POLL_MS : false),
+    // 미국 정규장 중에만 폴링. 국내는 전일 종가라 폴링 의미가 없다.
+    refetchInterval: () => (!isKr(symbol) && isUsMarketOpen() ? POLL_MS : false),
   });
   const status = queryStatus(detail);
   const watched = watchlist.isWatched(symbol);
@@ -218,7 +219,14 @@ export function StockDetailScreen({
 function QuoteHeader({ quote }: { quote: Quote }) {
   const color = changeColor(quote.changePct);
   const sign = quote.change > 0 ? "+" : "";
-  const cap = formatMarketCap(quote.marketCap);
+  const cap = formatMarketCap(quote.marketCap, quote.currency);
+  // 국내는 전일 종가(asOf=YYYY-MM-DD) → "종가 기준", 미국은 장중이면 "실시간".
+  const stamp =
+    quote.currency === "KRW"
+      ? `${formatDateKo(quote.asOf)} 종가 기준`
+      : isUsMarketOpen()
+        ? `실시간 · ${formatDateTimeKo(quote.asOf)}`
+        : `${formatDateTimeKo(quote.asOf)} 기준`;
   return (
     <div style={{ padding: "0 24px 8px" }}>
       <Text typography="t1" fontWeight="bold" color={adaptive.grey900}>
@@ -235,7 +243,7 @@ function QuoteHeader({ quote }: { quote: Quote }) {
       </div>
       <Text typography="t7" color={adaptive.grey500} style={{ display: "block", marginTop: 6 }}>
         {cap ? `시가총액 ${cap} · ` : ""}
-        {isUsMarketOpen() ? `실시간 · ${formatDateTimeKo(quote.asOf)}` : `${formatDateTimeKo(quote.asOf)} 기준`}
+        {stamp}
       </Text>
     </div>
   );

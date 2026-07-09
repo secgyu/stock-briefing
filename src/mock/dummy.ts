@@ -1,4 +1,4 @@
-import type { EarningsEvent, IpoEvent, NewsItem, SectorRank, SymbolInfo, WatchItem } from "../types";
+import type { EarningsEvent, IpoEvent, NewsItem, SectorRank, SymbolInfo } from "../types";
 
 /** 오늘로부터 n일 뒤(YYYY-MM-DD). 더미데이터 D-day가 항상 자연스럽게 보이도록 상대 계산 */
 function dayOffset(n: number, base: Date = new Date()): string {
@@ -199,12 +199,6 @@ export const MOCK_SYMBOLS: SymbolInfo[] = [
   { symbol: "AMZN", name: "아마존", market: "US", exchange: "NASDAQ" },
   { symbol: "JNJ", name: "존슨앤존슨", market: "US", exchange: "NYSE" },
   { symbol: "KO", name: "코카콜라", market: "US", exchange: "NYSE" },
-];
-
-/** 첫 실행 시 관심 목록이 비어있으면 데모용으로 미리 담아두는 종목 */
-export const DEFAULT_WATCHLIST: WatchItem[] = [
-  { symbol: "AAPL", name: "애플", market: "US", addedAt: hoursAgo(48) },
-  { symbol: "005930", name: "삼성전자", market: "KR", addedAt: hoursAgo(24) },
 ];
 
 /** 종목의 다음 실적 이벤트(관심 D-day 계산용) */

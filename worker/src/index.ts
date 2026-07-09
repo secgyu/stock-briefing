@@ -13,6 +13,7 @@ import {
 } from "./finnhub";
 import { fetchNaverNews, type NaverEnv } from "./naver";
 import { type DartEnv, fetchKrDisclosures } from "./dart";
+import { fetchKrQuote, type KrxEnv } from "./krx";
 
 // 검색·상세용 종목 마스터: KR mock + 미국 유니버스(88). 중복 심볼은 exchange가 있는 mock을 우선.
 const SYMBOL_MASTER: SymbolInfo[] = [
@@ -25,7 +26,7 @@ const SYMBOL_MASTER: SymbolInfo[] = [
 // 상대 날짜 mock은 반드시 builder(buildEarnings 등)를 요청 시점에 호출한다.
 // Workers는 모듈 로드 시 new Date()=epoch(0)이라 eager 상수를 쓰면 날짜가 1970이 된다.
 
-interface WorkerEnv extends Env, NaverEnv, DartEnv {
+interface WorkerEnv extends Env, NaverEnv, DartEnv, KrxEnv {
   CACHE: KVNamespace;
 }
 
@@ -47,6 +48,7 @@ async function cached<T>(env: WorkerEnv, key: string, ttlSec: number, producer: 
 const IPO_TTL = 21600; // 6h
 const QUOTE_TTL = 60; // KV 최소 TTL. 장중 클라 폴링과 맞물려 ~1분 단위 갱신
 const PROFILE_TTL = 86400; // 시총·통화는 장중 불변 → 24h
+const KR_QUOTE_TTL = 3600; // 국내 종가(일별). 하루 1회 갱신이라 1h면 충분
 const NEWS_TTL = 600; // 뉴스 10분 캐시 (네이버 25k/일 한도 여유)
 const DISCLOSURE_TTL = 3600; // 공시 1시간 캐시 (DART 20k/일 한도 여유)
 
@@ -134,7 +136,7 @@ const upcoming = <T extends { date: string }>(list: T[]) => list.filter((x) => d
 const ROUTES: { path: string; desc: string }[] = [
   { path: "/earnings/upcoming", desc: "다가오는 실적 발표 (전체)" },
   { path: "/earnings?symbol=AAPL", desc: "특정 종목의 실적 일정" },
-  { path: "/quote?symbol=AAPL", desc: "미국 종목 현재 시세(현재가·등락·시총)" },
+  { path: "/quote?symbol=AAPL", desc: "종목 시세(미국=실시간 근사, 국내=전일 종가)" },
   { path: "/ipo", desc: "다가오는 공모주(IPO)" },
   { path: "/sectors", desc: "산업별 주간 등락률" },
   { path: "/news", desc: "시장 뉴스 (또는 ?symbol=005930 종목 뉴스)" },
@@ -218,10 +220,17 @@ export default {
         }
       }
 
-      // 미국 종목 현재 시세. KR은 아직 시세 소스 없음(mock) → null.
+      // 종목 현재 시세. 미국=Finnhub(실시간 근사), 국내=금융위 종가(전일 기준).
       // 가격(코어)은 짧게(KV 하한 60s), 시총·통화(profile)는 길게 캐시해 Finnhub 콜을 아낀다.
       case "/quote": {
-        if (!symbol || isKr(symbol)) return json(null);
+        if (!symbol) return json(null);
+        if (isKr(symbol)) {
+          try {
+            return json(await cached(env, `krq:${symbol}`, KR_QUOTE_TTL, () => fetchKrQuote(symbol, env)));
+          } catch {
+            return json(null);
+          }
+        }
         try {
           const [core, prof] = await Promise.all([
             cached(env, `q:${symbol}`, QUOTE_TTL, () => fetchUsQuoteCore(symbol, env)),

@@ -22,18 +22,28 @@ export function marketLabel(market: Market): string {
   return market === "KR" ? "국내" : "해외";
 }
 
-/** 시세 통화 표기. USD → $1,234.56 */
+/** 시세 통화 표기. USD → $1,234.56 / KRW → 73,000원(정수) */
 export function formatPrice(price: number, currency: string): string {
+  if (currency === "KRW") return `${Math.round(price).toLocaleString("ko-KR")}원`;
   const n = price.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   return currency === "USD" ? `$${n}` : `${n} ${currency}`;
 }
 
-/** 시가총액(백만 USD 단위) → $3.45T / $12.3B / $456M. 값 없으면 null. */
-export function formatMarketCap(millions?: number): string | null {
-  if (millions == null || millions <= 0) return null;
-  if (millions >= 1_000_000) return `$${(millions / 1_000_000).toFixed(2)}T`;
-  if (millions >= 1_000) return `$${(millions / 1_000).toFixed(1)}B`;
-  return `$${Math.round(millions)}M`;
+/**
+ * 시가총액 표기. 통화별로 단위가 다르다.
+ * - USD: 값이 "백만 USD" 단위(Finnhub) → $3.45T / $12.3B / $456M
+ * - KRW: 값이 "원" 절대값(금융위) → 400.1조원 / 3,456억원
+ */
+export function formatMarketCap(cap?: number, currency = "USD"): string | null {
+  if (cap == null || cap <= 0) return null;
+  if (currency === "KRW") {
+    if (cap >= 1e12) return `${(cap / 1e12).toFixed(1)}조원`;
+    if (cap >= 1e8) return `${Math.round(cap / 1e8).toLocaleString("ko-KR")}억원`;
+    return `${Math.round(cap).toLocaleString("ko-KR")}원`;
+  }
+  if (cap >= 1_000_000) return `$${(cap / 1_000_000).toFixed(2)}T`;
+  if (cap >= 1_000) return `$${(cap / 1_000).toFixed(1)}B`;
+  return `$${Math.round(cap)}M`;
 }
 
 export function earningsTimeLabel(time?: EarningsTime): string | null {
