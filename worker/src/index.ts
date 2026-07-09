@@ -14,7 +14,7 @@ import {
 import { fetchNaverNews, type NaverEnv } from "./naver";
 import { type DartEnv, fetchKrDisclosures, KR_CORP } from "./dart";
 import { fetchKrQuote, type KrxEnv } from "./krx";
-import { fetchKrEarnings, type YahooEnv } from "./yahoo";
+import { fetchKrEarnings, fetchKrQuoteYahoo, type YahooEnv } from "./yahoo";
 
 // 검색·상세용 종목 마스터: KR mock + 미국 유니버스(88). 중복 심볼은 exchange가 있는 mock을 우선.
 const SYMBOL_MASTER: SymbolInfo[] = [
@@ -144,7 +144,7 @@ const upcoming = <T extends { date: string }>(list: T[]) => list.filter((x) => d
 const ROUTES: { path: string; desc: string }[] = [
   { path: "/earnings/upcoming", desc: "다가오는 실적 발표 (전체)" },
   { path: "/earnings?symbol=AAPL", desc: "특정 종목의 실적 일정" },
-  { path: "/quote?symbol=AAPL", desc: "종목 시세(미국=실시간 근사, 국내=전일 종가)" },
+  { path: "/quote?symbol=AAPL", desc: "종목 시세(미국=실시간 근사, 국내=Yahoo 20분 지연·폴백 전일 종가)" },
   { path: "/ipo", desc: "다가오는 공모주(IPO)" },
   { path: "/news", desc: "시장 뉴스 (또는 ?symbol=005930 종목 뉴스)" },
   { path: "/disclosures?symbol=005930", desc: "국내 종목 최근 공시 (DART)" },
@@ -227,10 +227,15 @@ export default {
       case "/quote": {
         if (!symbol) return json(null);
         if (isKr(symbol)) {
+          // 1순위: Yahoo 20분 지연 시세(장중 갱신, 60s 캐시). 실패 시 금융위 전일 종가로 폴백.
           try {
-            return json(await cached(env, `krq:${symbol}`, KR_QUOTE_TTL, () => fetchKrQuote(symbol, env)));
+            return json(await cached(env, `yq:${symbol}`, QUOTE_TTL, () => fetchKrQuoteYahoo(symbol, env)));
           } catch {
-            return json(null);
+            try {
+              return json(await cached(env, `krq:${symbol}`, KR_QUOTE_TTL, () => fetchKrQuote(symbol, env)));
+            } catch {
+              return json(null);
+            }
           }
         }
         try {

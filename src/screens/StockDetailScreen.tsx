@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { adaptive } from "@toss/tds-colors";
 import { Button, ListRow, Text, Top } from "@toss/tds-mobile";
 import { api } from "../api/client";
-import { isUsMarketOpen } from "../lib/market";
+import { isKrMarketOpen, isUsMarketOpen } from "../lib/market";
 import { daysUntil } from "../lib/dday";
 import { openExternal } from "../lib/external";
 import {
@@ -65,13 +65,13 @@ export function StockDetailScreen({
   onBack: () => void;
 }) {
   const detail = useQuery({ queryKey: ["detail", symbol], queryFn: () => loadDetail(symbol) });
-  // 시세는 별도 쿼리로 분리: 미국 정규장 중에만 30초 주기로 자동 갱신(장 마감/백그라운드면 멈춤).
+  // 시세는 별도 쿼리로 분리: 해당 시장 정규장 중에만 30초 주기로 자동 갱신(장 마감/백그라운드면 멈춤).
   const quoteQuery = useQuery({
     queryKey: ["quote", symbol],
     queryFn: () => api.quote(symbol),
     staleTime: 0, // 재진입·포커스 복귀 때 항상 최신 시세로
-    // 미국 정규장 중에만 폴링. 국내는 전일 종가라 폴링 의미가 없다.
-    refetchInterval: () => (!isKr(symbol) && isUsMarketOpen() ? POLL_MS : false),
+    // 국내(KRX)/미국 각 정규장 중에만 폴링. 국내는 Yahoo 20분 지연이라 장중엔 값이 움직인다.
+    refetchInterval: () => ((isKr(symbol) ? isKrMarketOpen() : isUsMarketOpen()) ? POLL_MS : false),
   });
   const status = queryStatus(detail);
   const watched = watchlist.isWatched(symbol);
@@ -220,10 +220,15 @@ function QuoteHeader({ quote }: { quote: Quote }) {
   const color = changeColor(quote.changePct);
   const sign = quote.change > 0 ? "+" : "";
   const cap = formatMarketCap(quote.marketCap, quote.currency);
-  // 국내는 전일 종가(asOf=YYYY-MM-DD) → "종가 기준", 미국은 장중이면 "실시간".
+  // asOf에 시각(T)이 있으면 장중 시세, 날짜만이면 종가(금융위 폴백).
+  const intraday = quote.asOf.includes("T");
   const stamp =
     quote.currency === "KRW"
-      ? `${formatDateKo(quote.asOf)} 종가 기준`
+      ? intraday
+        ? isKrMarketOpen()
+          ? `20분 지연 · ${formatDateTimeKo(quote.asOf)}`
+          : `${formatDateTimeKo(quote.asOf)} 기준`
+        : `${formatDateKo(quote.asOf)} 종가 기준`
       : isUsMarketOpen()
         ? `실시간 · ${formatDateTimeKo(quote.asOf)}`
         : `${formatDateTimeKo(quote.asOf)} 기준`;

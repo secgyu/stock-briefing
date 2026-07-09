@@ -1,4 +1,4 @@
-import type { EarningsEvent } from "../../src/types";
+import type { EarningsEvent, Quote } from "../../src/types";
 import { KR_CORP } from "./dart";
 
 export interface YahooEnv {
@@ -95,4 +95,47 @@ export async function fetchKrEarnings(codes: string[], env: YahooEnv): Promise<E
   let out = await run(codes, await session(env));
   if (out.length === 0) out = await run(codes, await session(env, true));
   return out;
+}
+
+interface YNum {
+  raw?: number;
+}
+interface YPrice {
+  regularMarketPrice?: YNum;
+  regularMarketChange?: YNum;
+  regularMarketChangePercent?: YNum; // 0.018 = 1.8%
+  regularMarketTime?: number; // epoch sec
+  marketCap?: YNum;
+  currency?: string;
+}
+
+async function oneQuote(code: string, s: Session): Promise<Quote> {
+  const url = `${Q}/v10/finance/quoteSummary/${code}.KS?modules=price&crumb=${encodeURIComponent(s.crumb)}`;
+  const res = await fetch(url, { headers: { "User-Agent": UA, cookie: s.cookie } });
+  if (!res.ok) throw new Error(`yahoo ${res.status}`);
+  const p = ((await res.json()) as { quoteSummary?: { result?: { price?: YPrice }[] } }).quoteSummary?.result?.[0]
+    ?.price;
+  const price = p?.regularMarketPrice?.raw;
+  if (p == null || price == null) throw new Error("yahoo: no price");
+  const t = p.regularMarketTime;
+  return {
+    price,
+    change: p.regularMarketChange?.raw ?? 0,
+    changePct: (p.regularMarketChangePercent?.raw ?? 0) * 100,
+    currency: p.currency ?? "KRW",
+    marketCap: p.marketCap?.raw,
+    asOf: t ? new Date(t * 1000).toISOString() : new Date().toISOString(),
+  };
+}
+
+/**
+ * 국내 종목 지연 시세(Yahoo, KRX 20분 지연). 크럼 만료 시 세션 재발급 후 1회 재시도.
+ * 실패하면 throw → 상위에서 금융위 종가로 폴백한다.
+ */
+export async function fetchKrQuoteYahoo(code: string, env: YahooEnv): Promise<Quote> {
+  try {
+    return await oneQuote(code, await session(env));
+  } catch {
+    return await oneQuote(code, await session(env, true));
+  }
 }
