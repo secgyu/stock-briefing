@@ -1,5 +1,5 @@
 import { adaptive } from "@toss/tds-colors";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import "./App.css";
 import config from "../granite.config";
 import { BottomTabBar, type TabKey } from "./components/BottomTabBar";
@@ -10,11 +10,49 @@ import { HomeScreen } from "./screens/HomeScreen";
 import { StockDetailScreen } from "./screens/StockDetailScreen";
 import { WatchScreen } from "./screens/WatchScreen";
 
+// 당겨서 새로고침 시 WebView가 페이지를 통째로 reload한다.
+// 화면 위치를 세션에 저장해 reload돼도 같은 화면으로 복원하고, 같은 세션이면 스플래시를 건너뛴다.
+const ss = {
+  get: (k: string): string | null => {
+    try {
+      return sessionStorage.getItem(k);
+    } catch {
+      return null;
+    }
+  },
+  set: (k: string, v: string) => {
+    try {
+      sessionStorage.setItem(k, v);
+    } catch {
+      /* 저장 불가 환경: 복원 없이 동작 */
+    }
+  },
+  del: (k: string) => {
+    try {
+      sessionStorage.removeItem(k);
+    } catch {
+      /* noop */
+    }
+  },
+};
+
+const TABS: TabKey[] = ["home", "calendar", "watch"];
+
 function App() {
-  const [booted, setBooted] = useState(false);
-  const [tab, setTab] = useState<TabKey>("home");
-  const [detailSymbol, setDetailSymbol] = useState<string | null>(null);
+  const [booted, setBooted] = useState(() => ss.get("booted") === "1");
+  const [tab, setTab] = useState<TabKey>(() => {
+    const saved = ss.get("tab");
+    return saved && (TABS as string[]).includes(saved) ? (saved as TabKey) : "home";
+  });
+  const [detailSymbol, setDetailSymbol] = useState<string | null>(() => ss.get("detail"));
   const watchlist = useWatchlist();
+
+  // 화면 위치를 세션에 동기화(새로고침 복원용).
+  useEffect(() => ss.set("tab", tab), [tab]);
+  useEffect(() => {
+    if (detailSymbol) ss.set("detail", detailSymbol);
+    else ss.del("detail");
+  }, [detailSymbol]);
 
   const openStock = (symbol: string) => setDetailSymbol(symbol);
   const closeStock = () => setDetailSymbol(null);
@@ -23,7 +61,15 @@ function App() {
 
   return (
     <>
-      {!booted && <SplashScreen primaryColor={config.brand.primaryColor} onDone={() => setBooted(true)} />}
+      {!booted && (
+        <SplashScreen
+          primaryColor={config.brand.primaryColor}
+          onDone={() => {
+            setBooted(true);
+            ss.set("booted", "1");
+          }}
+        />
+      )}
 
       <main
         style={{
