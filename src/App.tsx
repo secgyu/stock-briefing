@@ -4,6 +4,8 @@ import "./App.css";
 import config from "../granite.config";
 import { BottomTabBar, type TabKey } from "./components/BottomTabBar";
 import { SplashScreen } from "./components/SplashScreen";
+import { OnboardingScreen } from "./components/OnboardingScreen";
+import { storageGet, storageSet } from "./lib/storage";
 import { useWatchlist } from "./lib/watchlist";
 import { CalendarScreen } from "./screens/CalendarScreen";
 import { HomeScreen } from "./screens/HomeScreen";
@@ -38,14 +40,32 @@ const ss = {
 
 const TABS: TabKey[] = ["home", "calendar", "watch"];
 
+// 온보딩은 설치 후 최초 1회만(세션이 아니라 영구 저장). null=아직 로딩 중.
+const ONBOARD_KEY = "stock-briefing:onboarded:v1";
+
 function App() {
   const [booted, setBooted] = useState(() => ss.get("booted") === "1");
+  const [onboarded, setOnboarded] = useState<boolean | null>(null);
   const [tab, setTab] = useState<TabKey>(() => {
     const saved = ss.get("tab");
     return saved && (TABS as string[]).includes(saved) ? (saved as TabKey) : "home";
   });
   const [detailSymbol, setDetailSymbol] = useState<string | null>(() => ss.get("detail"));
   const watchlist = useWatchlist();
+
+  // 온보딩 노출 여부를 영구 저장소에서 로드(스플래시 떠 있는 동안 완료됨).
+  useEffect(() => {
+    let alive = true;
+    storageGet(ONBOARD_KEY).then((v) => alive && setOnboarded(v === "1"));
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  const finishOnboarding = () => {
+    setOnboarded(true);
+    void storageSet(ONBOARD_KEY, "1");
+  };
 
   // 화면 위치를 세션에 동기화(새로고침 복원용).
   useEffect(() => ss.set("tab", tab), [tab]);
@@ -69,6 +89,10 @@ function App() {
             ss.set("booted", "1");
           }}
         />
+      )}
+
+      {booted && onboarded === false && (
+        <OnboardingScreen primaryColor={config.brand.primaryColor} onFinish={finishOnboarding} />
       )}
 
       <main

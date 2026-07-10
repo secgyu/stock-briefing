@@ -52,6 +52,43 @@ export function StarIcon({ color, filled, size = 24 }: IconProps) {
   );
 }
 
+export function ChartIcon({ color, filled, size = 24 }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" aria-hidden>
+      <rect
+        x={4}
+        y={13}
+        width={4}
+        height={6}
+        rx={1.2}
+        stroke={color}
+        strokeWidth={1.8}
+        fill={filled ? color : "none"}
+      />
+      <rect
+        x={10}
+        y={9}
+        width={4}
+        height={10}
+        rx={1.2}
+        stroke={color}
+        strokeWidth={1.8}
+        fill={filled ? color : "none"}
+      />
+      <rect
+        x={16}
+        y={5}
+        width={4}
+        height={14}
+        rx={1.2}
+        stroke={color}
+        strokeWidth={1.8}
+        fill={filled ? color : "none"}
+      />
+    </svg>
+  );
+}
+
 export function SearchIcon({ color, size = 20 }: IconProps) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" aria-hidden>
