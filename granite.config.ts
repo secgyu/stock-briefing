@@ -5,7 +5,7 @@ export default defineConfig({
   brand: {
     displayName: "주식브리핑", // 화면에 노출될 앱의 한글 이름
     primaryColor: "#3182F6", // 토스 시그니처 블루
-    icon: "", // 배포(P6) 단계에서 앱 아이콘 URL 지정
+    icon: "https://static.toss.im/appsintoss/45211/f0f8f31e-5763-4038-8488-d6dc8e825651.png", // 콘솔 '앱 로고'와 동일 URL
   },
   web: {
     host: "localhost",

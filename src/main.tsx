@@ -6,7 +6,10 @@ import { createRoot } from "react-dom/client";
 import config from "../granite.config.ts";
 import App from "./App.tsx";
 import { queryClient } from "./lib/queryClient";
+import { initTheme } from "./lib/theme";
 import "./index.css";
+
+initTheme();
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
