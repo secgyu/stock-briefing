@@ -2,6 +2,7 @@ import { useState } from "react";
 import { adaptive } from "@toss/tds-colors";
 import { Button, Text } from "@toss/tds-mobile";
 import { CalendarIcon, ChartIcon, StarIcon } from "./icons";
+import { PlainButton } from "./layout";
 
 type IconComp = typeof CalendarIcon;
 
@@ -56,15 +57,11 @@ export function OnboardingScreen({ primaryColor, onFinish }: { primaryColor: str
       {/* 건너뛰기 */}
       <div style={{ display: "flex", justifyContent: "flex-end", paddingTop: 14, height: 44 }}>
         {!last && (
-          <button
-            type="button"
-            onClick={onFinish}
-            style={{ background: "none", border: "none", cursor: "pointer", padding: 6 }}
-          >
+          <PlainButton onClick={onFinish} style={{ padding: 6 }}>
             <Text typography="t6" fontWeight="medium" color={adaptive.grey500}>
               건너뛰기
             </Text>
-          </button>
+          </PlainButton>
         )}
       </div>
 

@@ -4,7 +4,7 @@ import type { Disclosure, EarningsEvent, IpoEvent, NewsItem, Quote, SymbolInfo }
 // ponytail: 환경변수 스위칭은 필요해지면 도입. 지금은 상수 하나로 충분.
 const BASE = "https://stock-briefing-api.oilwhere.workers.dev";
 
-/** {updatedAt, data} 봉투에서 data만 꺼내 반환. 실패 시 throw → useAsync가 error 상태로 처리. */
+/** {updatedAt, data} 봉투에서 data만 꺼내 반환. 실패 시 throw → react-query가 error 상태로 처리. */
 async function get<T>(path: string): Promise<T> {
   const res = await fetch(`${BASE}${path}`);
   if (!res.ok) throw new Error(`API ${res.status} ${path}`);

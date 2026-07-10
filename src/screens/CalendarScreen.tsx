@@ -3,15 +3,14 @@ import { Tab, Text, Top } from "@toss/tds-mobile";
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "../api/client";
-import { formatDateKo } from "../lib/format";
+import { formatDateKo, WEEKDAYS } from "../lib/format";
 import { queryStatus } from "../lib/queryClient";
 import type { UseWatchlist } from "../lib/watchlist";
-import { SectionCard, Screen } from "../components/layout";
+import { PlainButton, SectionCard, Screen } from "../components/layout";
 import { EarningsRow, IpoRow } from "../components/rows";
 import { AsyncSection, EmptyState } from "../components/states";
 import type { EarningsEvent, IpoEvent, Market } from "../types";
 
-const WEEKDAYS = ["일", "월", "화", "수", "목", "금", "토"];
 const MARKET_BY_INDEX: Array<Market | "all"> = ["all", "KR", "US"];
 
 function toKey(d: Date): string {
@@ -142,19 +141,19 @@ export function CalendarScreen({
 
       <SectionCard style={{ padding: "12px 8px" }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0 8px 8px" }}>
-          <button type="button" onClick={() => shift(-1)} style={arrowBtn} aria-label="이전">
+          <PlainButton onClick={() => shift(-1)} style={{ padding: "4px 12px" }} aria-label="이전">
             <Text typography="t5" color={adaptive.grey600}>
               ‹
             </Text>
-          </button>
+          </PlainButton>
           <Text typography="t6" fontWeight="bold" color={adaptive.grey800}>
             {headerRef.getFullYear()}년 {headerRef.getMonth() + 1}월
           </Text>
-          <button type="button" onClick={() => shift(1)} style={arrowBtn} aria-label="다음">
+          <PlainButton onClick={() => shift(1)} style={{ padding: "4px 12px" }} aria-label="다음">
             <Text typography="t5" color={adaptive.grey600}>
               ›
             </Text>
-          </button>
+          </PlainButton>
         </div>
 
         <div style={{ display: "flex", padding: "0 0 2px" }}>
@@ -199,16 +198,12 @@ export function CalendarScreen({
           ))
         )}
 
-        <button
-          type="button"
+        <PlainButton
           onClick={toggleView}
           style={{
             width: "100%",
-            background: "none",
-            border: "none",
             padding: "10px 0 2px",
             marginTop: 4,
-            cursor: "pointer",
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
@@ -221,7 +216,7 @@ export function CalendarScreen({
           <Text typography="t7" color={adaptive.blue500}>
             {viewMode === "week" ? "▾" : "▴"}
           </Text>
-        </button>
+        </PlainButton>
       </SectionCard>
 
       <div style={{ padding: "4px 20px 8px" }}>
@@ -259,13 +254,6 @@ export function CalendarScreen({
   );
 }
 
-const arrowBtn = {
-  background: "none",
-  border: "none",
-  padding: "4px 12px",
-  cursor: "pointer",
-} as const;
-
 /** 날짜 한 칸(주간·월간 공용). 선택 시 파란 원, 오늘은 파란 글자, 일정 있으면 점, 다른 달은 흐리게. */
 function DayCell({
   d,
@@ -286,18 +274,7 @@ function DayCell({
   const selected = key === selectedKey;
   const isToday = key === todayKey;
   return (
-    <button
-      type="button"
-      onClick={() => onSelect(key)}
-      style={{
-        flex: 1,
-        background: "none",
-        border: "none",
-        padding: "4px 0",
-        cursor: "pointer",
-        opacity: dimmed ? 0.35 : 1,
-      }}
-    >
+    <PlainButton onClick={() => onSelect(key)} style={{ flex: 1, padding: "4px 0", opacity: dimmed ? 0.35 : 1 }}>
       <div
         style={{
           margin: "0 auto",
@@ -327,6 +304,6 @@ function DayCell({
           background: dot && !selected ? adaptive.blue400 : "transparent",
         }}
       />
-    </button>
+    </PlainButton>
   );
 }

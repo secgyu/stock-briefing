@@ -1,16 +1,16 @@
-import { adaptive } from "@toss/tds-colors";
-import { ListRow, Text, TextField, Top } from "@toss/tds-mobile";
-import { useEffect, useMemo, useState } from "react";
+import { ListRow, TextField, Top } from "@toss/tds-mobile";
+import { useMemo, useState } from "react";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { api } from "../api/client";
 import { ddayLabel } from "../lib/dday";
+import { useDebouncedValue } from "../lib/hooks";
 import { marketFlag } from "../lib/format";
 import { logoCandidates } from "../lib/logo";
 import { queryStatus } from "../lib/queryClient";
-import type { UseWatchlist } from "../lib/watchlist";
+import { type UseWatchlist, withNextEarnings } from "../lib/watchlist";
 import { DdayBadge } from "../components/badges";
 import { SectionCard, SectionHeader, Screen } from "../components/layout";
-import { StarToggle } from "../components/rows";
+import { StarToggle, TwoLine } from "../components/rows";
 import { AsyncSection, EmptyState } from "../components/states";
 import { StockAvatar } from "../components/StockAvatar";
 
@@ -23,13 +23,7 @@ export function WatchScreen({
 }) {
   const [query, setQuery] = useState("");
   const q = query.trim();
-
-  // 키 입력마다 워커를 때리지 않도록 250ms 디바운스.
-  const [debouncedQ, setDebouncedQ] = useState(q);
-  useEffect(() => {
-    const t = setTimeout(() => setDebouncedQ(q), 250);
-    return () => clearTimeout(t);
-  }, [q]);
+  const debouncedQ = useDebouncedValue(q);
 
   // 검색어별로 캐시. 타이핑 중엔 이전 결과를 유지해 깜빡임을 없앤다.
   const search = useQuery({
@@ -41,18 +35,8 @@ export function WatchScreen({
 
   // 관심종목의 "다음 실적"은 다가오는 실적 전체에서 파생한다.
   const upcoming = useQuery({ queryKey: ["earnings", "upcoming"], queryFn: api.upcomingEarnings });
-  const nextOf = (symbol: string) => (upcoming.data ?? []).find((e) => e.symbol === symbol);
-
   const sortedWatch = useMemo(
-    () =>
-      watchlist.items
-        .map((w) => ({ item: w, next: nextOf(w.symbol) }))
-        .sort((a, b) => {
-          if (!a.next) return 1;
-          if (!b.next) return -1;
-          return a.next.date.localeCompare(b.next.date);
-        }),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    () => withNextEarnings(watchlist.items, upcoming.data ?? []),
     [watchlist.items, upcoming.data],
   );
 
@@ -85,18 +69,7 @@ export function WatchScreen({
                   onClick={() => onOpenStock(s.symbol)}
                   withTouchEffect
                   left={<StockAvatar name={s.name} seed={s.symbol} logoUrls={logoCandidates(s.symbol, s.market)} />}
-                  contents={
-                    <div>
-                      <Text typography="t6" fontWeight="bold" color={adaptive.grey900}>
-                        {s.name}
-                      </Text>
-                      <div style={{ marginTop: 2 }}>
-                        <Text typography="t7" color={adaptive.grey500}>
-                          {marketFlag(s.market)} {s.symbol} · {s.exchange}
-                        </Text>
-                      </div>
-                    </div>
-                  }
+                  contents={<TwoLine title={s.name} sub={`${marketFlag(s.market)} ${s.symbol} · ${s.exchange}`} />}
                   right={
                     <StarToggle
                       on={watchlist.isWatched(s.symbol)}
@@ -130,16 +103,10 @@ export function WatchScreen({
                   />
                 }
                 contents={
-                  <div>
-                    <Text typography="t6" fontWeight="bold" color={adaptive.grey900}>
-                      {item.name}
-                    </Text>
-                    <div style={{ marginTop: 2 }}>
-                      <Text typography="t7" color={adaptive.grey500}>
-                        {marketFlag(item.market)} {next ? `다음 실적 ${ddayLabel(next.date)}` : "예정 일정 없음"}
-                      </Text>
-                    </div>
-                  </div>
+                  <TwoLine
+                    title={item.name}
+                    sub={`${marketFlag(item.market)} ${next ? `다음 실적 ${ddayLabel(next.date)}` : "예정 일정 없음"}`}
+                  />
                 }
                 right={
                   <div style={{ display: "flex", alignItems: "center", gap: 6 }}>

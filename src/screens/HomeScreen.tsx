@@ -5,8 +5,9 @@ import { Text, Top } from "@toss/tds-mobile";
 import { api } from "../api/client";
 import { daysUntil } from "../lib/dday";
 import { openExternal } from "../lib/external";
+import { WEEKDAYS } from "../lib/format";
 import { type AsyncStatus, queryStatus } from "../lib/queryClient";
-import type { UseWatchlist } from "../lib/watchlist";
+import { type UseWatchlist, withNextEarnings } from "../lib/watchlist";
 import { DisclaimerFooter } from "../components/DisclaimerFooter";
 import { SettingsButton } from "../components/SettingsSheet";
 import { SectionCard, SectionHeader, Screen } from "../components/layout";
@@ -28,9 +29,6 @@ const withinWeek = (date: string, today: Date) => {
   return d >= 0 && d <= 7;
 };
 
-/** upcoming은 미래·오름차순 정렬이므로 심볼의 첫 매치가 곧 다음 실적. */
-const nextEarningsFrom = (list: EarningsEvent[], symbol: string) => list.find((e) => e.symbol === symbol);
-
 async function loadHome(): Promise<HomeData> {
   const [upcoming, ipos, news] = await Promise.all([api.upcomingEarnings(), api.ipos(), api.news()]);
   const today = new Date();
@@ -44,12 +42,10 @@ async function loadHome(): Promise<HomeData> {
   };
 }
 
-const WEEKDAY = ["일", "월", "화", "수", "목", "금", "토"];
-
 /** 상단 히어로. 브랜드 블루로 화면 시선의 앵커를 만들고 이번 주 요약을 제시한다. */
 function HomeHero({ earnings, ipos }: { earnings: number; ipos: number }) {
   const now = new Date();
-  const dateLabel = `${now.getMonth() + 1}월 ${now.getDate()}일 ${WEEKDAY[now.getDay()]}요일`;
+  const dateLabel = `${now.getMonth() + 1}월 ${now.getDate()}일 ${WEEKDAYS[now.getDay()]}요일`;
   return (
     <div style={{ margin: "4px 16px 16px", borderRadius: 20, padding: "20px 22px", background: "#3182F6" }}>
       <Text typography="t7" fontWeight="medium" color="rgba(255,255,255,0.75)">
@@ -144,13 +140,7 @@ export function HomeScreen({
   const data = home.data;
   const retry = () => void home.refetch();
 
-  const watched = watchlist.items
-    .map((w) => ({ item: w, next: nextEarningsFrom(data?.allUpcoming ?? [], w.symbol) }))
-    .sort((a, b) => {
-      if (!a.next) return 1;
-      if (!b.next) return -1;
-      return a.next.date.localeCompare(b.next.date);
-    });
+  const watched = withNextEarnings(watchlist.items, data?.allUpcoming ?? []);
 
   return (
     <Screen>

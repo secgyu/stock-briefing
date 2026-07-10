@@ -2,6 +2,7 @@ import { adaptive } from "@toss/tds-colors";
 import { ListRow, Text, useBottomSheet } from "@toss/tds-mobile";
 import { useThemePref, type ThemePref } from "../lib/theme";
 import { CheckIcon, GearIcon } from "./icons";
+import { PlainButton } from "./layout";
 
 const THEME_OPTIONS: Array<{ value: ThemePref; label: string; desc: string }> = [
   { value: "system", label: "시스템 설정 따르기", desc: "토스·기기 화면 모드에 맞춰요" },
@@ -45,19 +46,12 @@ function ThemeOptions() {
 export function SettingsButton() {
   const { open, close } = useBottomSheet();
   return (
-    <button
-      type="button"
+    <PlainButton
       aria-label="설정"
-      onClick={() =>
-        open({
-          header: "화면 테마",
-          children: <ThemeOptions />,
-          onClose: () => close(),
-        })
-      }
-      style={{ background: "none", border: "none", cursor: "pointer", padding: 8, display: "flex" }}
+      onClick={() => open({ header: "화면 테마", children: <ThemeOptions />, onClose: () => close() })}
+      style={{ padding: 8, display: "flex" }}
     >
       <GearIcon color={adaptive.grey500} />
-    </button>
+    </PlainButton>
   );
 }

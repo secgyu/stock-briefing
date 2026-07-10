@@ -2,7 +2,8 @@ import { useQuery } from "@tanstack/react-query";
 import { adaptive } from "@toss/tds-colors";
 import { Button, ListRow, Text, Top } from "@toss/tds-mobile";
 import { api } from "../api/client";
-import { isKrMarketOpen, isUsMarketOpen } from "../lib/market";
+import { useQuote } from "../lib/hooks";
+import { isKr, isKrMarketOpen, isUsMarketOpen } from "../lib/market";
 import { daysUntil } from "../lib/dday";
 import { openExternal } from "../lib/external";
 import {
@@ -19,16 +20,13 @@ import {
 import { queryStatus } from "../lib/queryClient";
 import type { UseWatchlist } from "../lib/watchlist";
 import { DdayBadge, EstimatedBadge } from "../components/badges";
-import { SectionCard, SectionHeader, Screen } from "../components/layout";
-import { NewsRow } from "../components/rows";
+import { PlainButton, SectionCard, SectionHeader, Screen } from "../components/layout";
+import { NewsRow, TwoLine } from "../components/rows";
 import { EmptyState, ErrorState, ListSkeleton } from "../components/states";
 import { ChevronRightIcon } from "../components/icons";
 import type { Disclosure, EarningsEvent, NewsItem, Quote, SymbolInfo } from "../types";
 
 const DART_SEARCH = "https://dart.fss.or.kr/dsab007/main.do";
-
-/** 6자리 숫자면 국내 종목. 국내만 DART 공시를 조회한다. */
-const isKr = (s: string) => /^\d{6}$/.test(s);
 
 interface DetailData {
   info?: SymbolInfo;
@@ -53,8 +51,6 @@ async function loadDetail(symbol: string): Promise<DetailData> {
   return { info, next, news, disclosures };
 }
 
-const POLL_MS = 30_000;
-
 export function StockDetailScreen({
   symbol,
   watchlist,
@@ -65,14 +61,7 @@ export function StockDetailScreen({
   onBack: () => void;
 }) {
   const detail = useQuery({ queryKey: ["detail", symbol], queryFn: () => loadDetail(symbol) });
-  // 시세는 별도 쿼리로 분리: 해당 시장 정규장 중에만 30초 주기로 자동 갱신(장 마감/백그라운드면 멈춤).
-  const quoteQuery = useQuery({
-    queryKey: ["quote", symbol],
-    queryFn: () => api.quote(symbol),
-    staleTime: 0, // 재진입·포커스 복귀 때 항상 최신 시세로
-    // 국내(KRX)/미국 각 정규장 중에만 폴링. 국내는 Yahoo 20분 지연이라 장중엔 값이 움직인다.
-    refetchInterval: () => ((isKr(symbol) ? isKrMarketOpen() : isUsMarketOpen()) ? POLL_MS : false),
-  });
+  const quoteQuery = useQuote(symbol);
   const status = queryStatus(detail);
   const watched = watchlist.isWatched(symbol);
 
@@ -184,18 +173,7 @@ export function StockDetailScreen({
                 key={d.url}
                 onClick={() => openExternal(d.url)}
                 withTouchEffect
-                contents={
-                  <div>
-                    <Text typography="t6" fontWeight="medium" color={adaptive.grey900}>
-                      {d.title}
-                    </Text>
-                    <div style={{ marginTop: 2 }}>
-                      <Text typography="t7" color={adaptive.grey500}>
-                        {d.filer} · {formatDateKo(d.date)}
-                      </Text>
-                    </div>
-                  </div>
-                }
+                contents={<TwoLine title={d.title} sub={`${d.filer} · ${formatDateKo(d.date)}`} fontWeight="medium" />}
                 right={<ChevronRightIcon color={adaptive.grey400} />}
               />
             ))
@@ -257,23 +235,11 @@ function QuoteHeader({ quote }: { quote: Quote }) {
 function BackBar({ onBack }: { onBack: () => void }) {
   return (
     <div style={{ padding: "8px 12px 0" }}>
-      <button
-        type="button"
-        onClick={onBack}
-        aria-label="뒤로"
-        style={{
-          background: "none",
-          border: "none",
-          padding: 8,
-          cursor: "pointer",
-          display: "flex",
-          alignItems: "center",
-        }}
-      >
+      <PlainButton onClick={onBack} aria-label="뒤로" style={{ padding: 8, display: "flex", alignItems: "center" }}>
         <span style={{ display: "inline-flex", transform: "rotate(180deg)" }}>
           <ChevronRightIcon color={adaptive.grey700} size={24} />
         </span>
-      </button>
+      </PlainButton>
     </div>
   );
 }

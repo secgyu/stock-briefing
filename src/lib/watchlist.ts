@@ -1,43 +1,27 @@
-import { Storage } from "@apps-in-toss/web-framework";
 import { useCallback, useEffect, useState } from "react";
-import type { Market, WatchItem } from "../types";
+import { storageGet, storageSet } from "./storage";
+import type { EarningsEvent, Market, WatchItem } from "../types";
 
-// v2: 첫 실행 기본 관심종목(mock) 시딩 제거 → 빈 목록으로 시작. 이전 시드값도 자연히 무시됨.
+/** 관심종목에 다음 실적(upcoming은 미래·오름차순이라 첫 매치)을 붙여 임박순 정렬. 일정 없으면 뒤로. */
+export function withNextEarnings(
+  items: WatchItem[],
+  upcoming: EarningsEvent[],
+): Array<{ item: WatchItem; next?: EarningsEvent }> {
+  return items
+    .map((item) => ({ item, next: upcoming.find((e) => e.symbol === item.symbol) }))
+    .sort((a, b) => {
+      if (!a.next) return 1;
+      if (!b.next) return -1;
+      return a.next.date.localeCompare(b.next.date);
+    });
+}
+
+// v2: 첫 실행 기본 관심종목(mock) 시딩 제거 → 빈 목록으로 시작.
 const KEY = "stock-briefing:watchlist:v2";
 
-// ponytail: 브라우저(토스 브릿지 없음)에서는 SDK Storage 호출이 멈춰있을 수 있어
-// 500ms 안에 응답 없으면 localStorage로 폴백한다. 실기기에선 즉시 응답하므로 무해.
-function withTimeout<T>(p: Promise<T>, ms = 500): Promise<T> {
-  return Promise.race([p, new Promise<T>((_, reject) => setTimeout(() => reject(new Error("storage timeout")), ms))]);
-}
-
-async function readRaw(): Promise<string | null> {
-  try {
-    return await withTimeout(Storage.getItem(KEY));
-  } catch {
-    try {
-      return localStorage.getItem(KEY);
-    } catch {
-      return null;
-    }
-  }
-}
-
-async function writeRaw(value: string): Promise<void> {
-  try {
-    await withTimeout(Storage.setItem(KEY, value));
-  } catch {
-    try {
-      localStorage.setItem(KEY, value);
-    } catch {
-      /* 저장 불가 환경: 이번 세션 메모리로만 유지 */
-    }
-  }
-}
-
 export async function loadWatchlist(): Promise<WatchItem[]> {
-  const raw = await readRaw();
-  if (raw == null) return []; // 첫 실행: 빈 관심목록으로 시작
+  const raw = await storageGet(KEY);
+  if (raw == null) return [];
   try {
     const parsed = JSON.parse(raw);
     return Array.isArray(parsed) ? (parsed as WatchItem[]) : [];
@@ -47,7 +31,7 @@ export async function loadWatchlist(): Promise<WatchItem[]> {
 }
 
 export async function saveWatchlist(items: WatchItem[]): Promise<void> {
-  await writeRaw(JSON.stringify(items));
+  await storageSet(KEY, JSON.stringify(items));
 }
 
 export interface UseWatchlist {

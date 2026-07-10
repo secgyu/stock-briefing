@@ -6,34 +6,46 @@ import { logoCandidates } from "../lib/logo";
 import type { EarningsEvent, IpoEvent, NewsItem } from "../types";
 import { DdayBadge, EstimatedBadge } from "./badges";
 import { StarIcon } from "./icons";
+import { PlainButton } from "./layout";
 import { StockAvatar } from "./StockAvatar";
 
-function Subline({ children }: { children: ReactNode }) {
+export function Subline({ children }: { children: ReactNode }) {
   return <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 2 }}>{children}</div>;
 }
 
-function NameLine({ name }: { name: string }) {
+export function NameLine({ name, fontWeight = "bold" }: { name: string; fontWeight?: "bold" | "medium" }) {
   return (
-    <Text typography="t6" fontWeight="bold" color={adaptive.grey900}>
+    <Text typography="t6" fontWeight={fontWeight} color={adaptive.grey900}>
       {name}
     </Text>
   );
 }
 
-/** 별표 토글 버튼 */
+/** 리스트 행의 "제목 + 회색 부제" 두 줄 콘텐츠 */
+export function TwoLine({ title, sub, fontWeight }: { title: string; sub: ReactNode; fontWeight?: "bold" | "medium" }) {
+  return (
+    <div>
+      <NameLine name={title} fontWeight={fontWeight} />
+      <Subline>
+        <Text typography="t7" color={adaptive.grey500}>
+          {sub}
+        </Text>
+      </Subline>
+    </div>
+  );
+}
+
 export function StarToggle({ on, onClick }: { on: boolean; onClick: () => void }) {
   return (
-    <button
-      type="button"
+    <PlainButton
       onClick={(e) => {
         e.stopPropagation();
         onClick();
       }}
       aria-label={on ? "관심 해제" : "관심 등록"}
-      style={{ background: "none", border: "none", padding: 4, cursor: "pointer" }}
     >
       <StarIcon color={on ? adaptive.yellow500 : adaptive.grey300} filled={on} size={22} />
-    </button>
+    </PlainButton>
   );
 }
 

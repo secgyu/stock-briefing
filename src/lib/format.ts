@@ -72,8 +72,9 @@ export function relativeTime(iso: string, now: Date = new Date()): string {
   return `${day}일 전`;
 }
 
+export const WEEKDAYS = ["일", "월", "화", "수", "목", "금", "토"];
+
 /** "2026-07-09" → "7월 9일 (목)" */
-const WEEKDAYS = ["일", "월", "화", "수", "목", "금", "토"];
 export function formatDateKo(dateStr: string): string {
   const [y, m, d] = dateStr.split("-").map(Number);
   const wd = WEEKDAYS[new Date(y, m - 1, d).getDay()];

@@ -1,6 +1,7 @@
 import { adaptive } from "@toss/tds-colors";
 import { Text } from "@toss/tds-mobile";
 import { CalendarIcon, HomeIcon, StarIcon } from "./icons";
+import { PlainButton } from "./layout";
 
 export type TabKey = "home" | "calendar" | "watch";
 
@@ -25,9 +26,8 @@ export function BottomTabBar({ active, onChange }: { active: TabKey; onChange: (
         const on = key === active;
         const color = on ? adaptive.blue500 : adaptive.grey500;
         return (
-          <button
+          <PlainButton
             key={key}
-            type="button"
             onClick={() => onChange(key)}
             aria-label={label}
             aria-current={on}
@@ -38,16 +38,13 @@ export function BottomTabBar({ active, onChange }: { active: TabKey; onChange: (
               alignItems: "center",
               gap: 3,
               padding: "8px 0 10px",
-              background: "none",
-              border: "none",
-              cursor: "pointer",
             }}
           >
             <Icon color={color} filled={on} />
             <Text typography="st13" fontWeight={on ? "bold" : "medium"} color={color}>
               {label}
             </Text>
-          </button>
+          </PlainButton>
         );
       })}
     </nav>
