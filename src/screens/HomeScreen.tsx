@@ -8,6 +8,7 @@ import { openExternal } from "../lib/external";
 import { type AsyncStatus, queryStatus } from "../lib/queryClient";
 import type { UseWatchlist } from "../lib/watchlist";
 import { DisclaimerFooter } from "../components/DisclaimerFooter";
+import { SettingsButton } from "../components/SettingsSheet";
 import { SectionCard, SectionHeader, Screen } from "../components/layout";
 import { EarningsRow, IpoRow, NewsRow } from "../components/rows";
 import { AsyncSection, EmptyState, ListSkeleton } from "../components/states";
@@ -153,7 +154,13 @@ export function HomeScreen({
 
   return (
     <Screen>
-      <Top title={<Top.TitleParagraph size={22}>주식브리핑</Top.TitleParagraph>} />
+      <div style={{ position: "relative" }}>
+        <Top title={<Top.TitleParagraph size={22}>주식브리핑</Top.TitleParagraph>} />
+        {/* Top엔 우측 슬롯이 없어 헤더 우측에 겹쳐 배치한다. */}
+        <div style={{ position: "absolute", top: 0, right: 12, height: "100%", display: "flex", alignItems: "center" }}>
+          <SettingsButton />
+        </div>
+      </div>
 
       <HomeHero earnings={data?.earningsThisWeek ?? 0} ipos={data?.iposThisWeek ?? 0} />
 
