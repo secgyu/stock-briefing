@@ -133,7 +133,7 @@ function addDays(dateStr: string, n: number): string {
  * 장 마감 후(AMC, ~16:00 ET)는 KST로 다음날 새벽 → +1일. 개장 전(BMO)·장중은 같은 날.
  * (토스 앱도 KST로 표기해 AMC 종목이 하루 뒤로 보인다.)
  */
-const toKstDate = (usDate: string, hour?: string): string => (hour === "amc" ? addDays(usDate, 1) : usDate);
+export const toKstDate = (usDate: string, hour?: string): string => (hour === "amc" ? addDays(usDate, 1) : usDate);
 
 /** 오늘부터 +days 까지의 [from,to] 날짜 문자열. Finnhub 무료는 최대 1개월. */
 function window(days: number): { from: string; to: string } {
