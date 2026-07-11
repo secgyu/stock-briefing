@@ -107,14 +107,19 @@ export function CalendarScreen({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [data, market]);
 
-  // 화살표: 주간이면 ±1주, 월간이면 ±1개월.
+  // 화살표: 주간이면 ±1주, 월간이면 ±1개월. 선택 날짜도 같이 옮겨 아래 일정 목록이 보이는 범위를 따라간다.
   const shift = (dir: -1 | 1) => {
     if (viewMode === "week") {
       const next = new Date(weekStart);
       next.setDate(next.getDate() + dir * 7);
       setWeekStart(next);
+      const sel = fromKey(selectedKey);
+      sel.setDate(sel.getDate() + dir * 7);
+      setSelectedKey(toKey(sel));
     } else {
-      setMonthAnchor(new Date(monthAnchor.getFullYear(), monthAnchor.getMonth() + dir, 1));
+      const anchor = new Date(monthAnchor.getFullYear(), monthAnchor.getMonth() + dir, 1);
+      setMonthAnchor(anchor);
+      setSelectedKey(toKey(anchor)); // 새 달의 1일 선택
     }
   };
 

@@ -1,5 +1,5 @@
-import { describe, expect, it } from "vitest";
-import { SYMBOL_MASTER } from "./index";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { SYMBOL_MASTER, upcoming } from "./index";
 import { KR_CORP } from "./dart";
 import { US_SYMBOLS } from "./finnhub";
 
@@ -26,5 +26,26 @@ describe("SYMBOL_MASTER", () => {
       expect(s.name.length, s.symbol).toBeGreaterThan(0);
       expect(["KR", "US"]).toContain(s.market);
     }
+  });
+});
+
+// 워커는 UTC로 돌지만 앱 날짜는 KST 기준 → 필터도 KST 오늘이어야 한다.
+describe("upcoming (KST 기준 필터)", () => {
+  afterEach(() => vi.useRealTimers());
+
+  it("KST 새벽(UTC는 아직 어제)엔 KST 기준 어제 일정을 제외한다", () => {
+    vi.useFakeTimers();
+    // UTC 2026-07-10 17:00 = KST 2026-07-11 02:00
+    vi.setSystemTime(new Date("2026-07-10T17:00:00Z"));
+    const out = upcoming([{ date: "2026-07-10" }, { date: "2026-07-11" }, { date: "2026-07-12" }]);
+    expect(out.map((x) => x.date)).toEqual(["2026-07-11", "2026-07-12"]);
+  });
+
+  it("오늘(KST) 일정은 포함하고 임박순 정렬한다", () => {
+    vi.useFakeTimers();
+    // UTC 2026-07-11 01:00 = KST 2026-07-11 10:00
+    vi.setSystemTime(new Date("2026-07-11T01:00:00Z"));
+    const out = upcoming([{ date: "2026-07-20" }, { date: "2026-07-11" }]);
+    expect(out.map((x) => x.date)).toEqual(["2026-07-11", "2026-07-20"]);
   });
 });

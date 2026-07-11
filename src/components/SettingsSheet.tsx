@@ -10,8 +10,8 @@ const THEME_OPTIONS: Array<{ value: ThemePref; label: string; desc: string }> = 
   { value: "dark", label: "다크 모드", desc: "항상 어두운 화면으로 보여요" },
 ];
 
-/** 설정 바텀시트 본문. 선택 즉시 테마가 적용된다. */
-function ThemeOptions() {
+/** 설정 바텀시트 본문. 선택 즉시 테마가 적용되고 시트가 닫힌다. */
+function ThemeOptions({ onSelect }: { onSelect: () => void }) {
   const [pref, setPref] = useThemePref();
   return (
     <div style={{ paddingBottom: 8 }}>
@@ -20,7 +20,10 @@ function ThemeOptions() {
         return (
           <ListRow
             key={value}
-            onClick={() => setPref(value)}
+            onClick={() => {
+              setPref(value);
+              onSelect();
+            }}
             withTouchEffect
             contents={
               <div>
@@ -48,7 +51,7 @@ export function SettingsButton() {
   return (
     <PlainButton
       aria-label="설정"
-      onClick={() => open({ header: "화면 테마", children: <ThemeOptions />, onClose: () => close() })}
+      onClick={() => open({ header: "화면 테마", children: <ThemeOptions onSelect={close} />, onClose: () => close() })}
       style={{ padding: 8, display: "flex" }}
     >
       <GearIcon color={adaptive.grey500} />

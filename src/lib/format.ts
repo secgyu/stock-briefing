@@ -22,11 +22,13 @@ export function marketLabel(market: Market): string {
   return market === "KR" ? "국내" : "해외";
 }
 
-/** 시세 통화 표기. USD → $1,234.56 / KRW → 73,000원(정수) */
+/** 시세 통화 표기. USD → $1,234.56 / KRW → 73,000원(정수). 음수는 -$12.30처럼 부호를 앞에. */
 export function formatPrice(price: number, currency: string): string {
-  if (currency === "KRW") return `${Math.round(price).toLocaleString("ko-KR")}원`;
-  const n = price.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-  return currency === "USD" ? `$${n}` : `${n} ${currency}`;
+  const sign = price < 0 ? "-" : "";
+  const abs = Math.abs(price);
+  if (currency === "KRW") return `${sign}${Math.round(abs).toLocaleString("ko-KR")}원`;
+  const n = abs.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  return currency === "USD" ? `${sign}$${n}` : `${sign}${n} ${currency}`;
 }
 
 /**

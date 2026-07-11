@@ -11,6 +11,10 @@ describe("formatPrice", () => {
   it("KRW는 정수 + 원", () => expect(formatPrice(73000.4, "KRW")).toBe("73,000원"));
   it("USD는 소수 2자리 + $", () => expect(formatPrice(1234.5, "USD")).toBe("$1,234.50"));
   it("기타 통화는 코드 병기", () => expect(formatPrice(10, "JPY")).toBe("10.00 JPY"));
+  it("음수는 부호가 통화기호 앞", () => {
+    expect(formatPrice(-12.3, "USD")).toBe("-$12.30");
+    expect(formatPrice(-10500, "KRW")).toBe("-10,500원");
+  });
 });
 
 describe("formatMarketCap (USD, 백만 단위 입력)", () => {

@@ -1,4 +1,3 @@
-import { daysUntil } from "../../src/lib/dday";
 import type { EarningsEvent, IpoEvent, SymbolInfo } from "../../src/types";
 import { MOCK_SYMBOLS } from "../../src/mock/dummy";
 import {
@@ -45,8 +44,9 @@ const isKr = (s: string) => /^\d{6}$/.test(s);
  * 캐시가 있으면 그대로, 없으면 producer 실행 후 ttlSec 동안 보관.
  */
 async function cached<T>(env: WorkerEnv, key: string, ttlSec: number, producer: () => Promise<T>): Promise<T> {
-  const hit = await env.CACHE.get<T>(key, "json");
-  if (hit != null) return hit;
+  // text로 읽어 "저장된 null"(캐시 히트)과 "키 없음"(미스)을 구분한다.
+  const hit = await env.CACHE.get(key, "text");
+  if (hit != null) return JSON.parse(hit) as T;
   const val = await producer();
   await env.CACHE.put(key, JSON.stringify(val), { expirationTtl: ttlSec });
   return val;
@@ -146,7 +146,12 @@ function json(data: unknown): Response {
 }
 
 const byDate = <T extends { date: string }>(a: T, b: T) => a.date.localeCompare(b.date);
-const upcoming = <T extends { date: string }>(list: T[]) => list.filter((x) => daysUntil(x.date) >= 0).sort(byDate);
+
+// 앱의 모든 날짜는 KST 기준(AMC→+1일 변환 포함). 워커는 UTC로 돌아서 UTC 오늘로 거르면
+// KST 00~09시에 어제 일정이 "임박"으로 남는다 → KST 오늘 날짜 문자열로 비교.
+const kstToday = (): string => new Date(Date.now() + 9 * 3600_000).toISOString().slice(0, 10);
+export const upcoming = <T extends { date: string }>(list: T[]): T[] =>
+  list.filter((x) => x.date >= kstToday()).sort(byDate);
 
 /** `/` 안내 페이지용 엔드포인트 목록. 실제 라우트와 한 곳에서 관리한다. */
 const ROUTES: { path: string; desc: string }[] = [
