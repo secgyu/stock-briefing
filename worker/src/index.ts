@@ -16,9 +16,17 @@ import { type DartEnv, fetchKrDisclosures, KR_CORP } from "./dart";
 import { fetchKrQuote, type KrxEnv } from "./krx";
 import { fetchKrEarnings, fetchKrQuoteYahoo, type YahooEnv } from "./yahoo";
 
-// 검색·상세용 종목 마스터: KR mock + 미국 유니버스(88). 중복 심볼은 exchange가 있는 mock을 우선.
-const SYMBOL_MASTER: SymbolInfo[] = [
+// 검색·상세용 종목 마스터: KR mock + KR_CORP(공시·실적 유니버스 20, 전부 코스피) + 미국 유니버스(88).
+// 중복 심볼은 mock 우선. KR_CORP 미병합 시 셀트리온 등 14종이 캘린더엔 뜨는데 검색·상세가 안 됐다.
+const KR_INFO: SymbolInfo[] = Object.entries(KR_CORP).map(([symbol, { name }]) => ({
+  symbol,
+  name,
+  market: "KR",
+  exchange: "KOSPI",
+}));
+export const SYMBOL_MASTER: SymbolInfo[] = [
   ...MOCK_SYMBOLS,
+  ...KR_INFO.filter((k) => !MOCK_SYMBOLS.some((m) => m.symbol === k.symbol)),
   ...US_INFO.filter((u) => !MOCK_SYMBOLS.some((m) => m.symbol === u.symbol)),
 ];
 

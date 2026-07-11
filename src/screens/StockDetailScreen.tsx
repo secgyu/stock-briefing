@@ -22,7 +22,7 @@ import type { UseWatchlist } from "../lib/watchlist";
 import { DdayBadge, EstimatedBadge } from "../components/badges";
 import { PlainButton, SectionCard, SectionHeader, Screen } from "../components/layout";
 import { NewsRow, TwoLine } from "../components/rows";
-import { EmptyState, ErrorState, ListSkeleton } from "../components/states";
+import { EmptyState, ErrorState, InlineError, ListSkeleton } from "../components/states";
 import { ChevronRightIcon } from "../components/icons";
 import type { Disclosure, EarningsEvent, NewsItem, Quote, SymbolInfo } from "../types";
 
@@ -111,7 +111,12 @@ export function StockDetailScreen({
         }
       />
 
-      {quote && <QuoteHeader quote={quote} />}
+      {/* quote가 null이면 시세 소스 없는 종목(정상 숨김). 에러는 침묵하지 않고 재시도를 준다. */}
+      {quote ? (
+        <QuoteHeader quote={quote} />
+      ) : quoteQuery.isError ? (
+        <InlineError message="시세를 불러오지 못했어요" onRetry={() => void quoteQuery.refetch()} />
+      ) : null}
 
       <div style={{ padding: "4px 24px 16px" }}>
         <Button

@@ -2,16 +2,14 @@ import { ListRow, TextField, Top } from "@toss/tds-mobile";
 import { useMemo, useState } from "react";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { api } from "../api/client";
-import { ddayLabel } from "../lib/dday";
-import { useDebouncedValue } from "../lib/hooks";
+import { useDebouncedValue, useUpcomingEarnings } from "../lib/hooks";
 import { marketFlag } from "../lib/format";
 import { logoCandidates } from "../lib/logo";
 import { queryStatus } from "../lib/queryClient";
 import { type UseWatchlist, withNextEarnings } from "../lib/watchlist";
-import { DdayBadge } from "../components/badges";
 import { SectionCard, SectionHeader, Screen } from "../components/layout";
-import { StarToggle, TwoLine } from "../components/rows";
-import { AsyncSection, EmptyState } from "../components/states";
+import { StarToggle, TwoLine, WatchRow } from "../components/rows";
+import { AsyncSection, EmptyState, InlineError } from "../components/states";
 import { StockAvatar } from "../components/StockAvatar";
 
 export function WatchScreen({
@@ -33,8 +31,8 @@ export function WatchScreen({
     placeholderData: keepPreviousData,
   });
 
-  // 관심종목의 "다음 실적"은 다가오는 실적 전체에서 파생한다.
-  const upcoming = useQuery({ queryKey: ["earnings", "upcoming"], queryFn: api.upcomingEarnings });
+  // 관심종목의 "다음 실적"은 다가오는 실적 전체에서 파생한다(Home/Calendar와 캐시 공유).
+  const upcoming = useUpcomingEarnings();
   const sortedWatch = useMemo(
     () => withNextEarnings(watchlist.items, upcoming.data ?? []),
     [watchlist.items, upcoming.data],
@@ -90,32 +88,20 @@ export function WatchScreen({
               description="위 검색창에서 종목을 찾아 별표를 눌러 추가하세요."
             />
           ) : (
-            sortedWatch.map(({ item, next }) => (
-              <ListRow
-                key={item.symbol}
-                onClick={() => onOpenStock(item.symbol)}
-                withTouchEffect
-                left={
-                  <StockAvatar
-                    name={item.name}
-                    seed={item.symbol}
-                    logoUrls={logoCandidates(item.symbol, item.market)}
-                  />
-                }
-                contents={
-                  <TwoLine
-                    title={item.name}
-                    sub={`${marketFlag(item.market)} ${next ? `다음 실적 ${ddayLabel(next.date)}` : "예정 일정 없음"}`}
-                  />
-                }
-                right={
-                  <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                    {next && <DdayBadge date={next.date} />}
-                    <StarToggle on onClick={() => watchlist.remove(item.symbol)} />
-                  </div>
-                }
-              />
-            ))
+            <>
+              {upcoming.isError && (
+                <InlineError message="실적 일정을 불러오지 못했어요" onRetry={() => void upcoming.refetch()} />
+              )}
+              {sortedWatch.map(({ item, next }) => (
+                <WatchRow
+                  key={item.symbol}
+                  item={item}
+                  next={next}
+                  onClick={() => onOpenStock(item.symbol)}
+                  onRemove={() => watchlist.remove(item.symbol)}
+                />
+              ))}
+            </>
           )}
         </SectionCard>
       )}

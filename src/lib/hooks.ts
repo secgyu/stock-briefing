@@ -13,6 +13,19 @@ export function useDebouncedValue<T>(value: T, ms = 250): T {
   return debounced;
 }
 
+// 화면 공용 쿼리. 키를 통일해 Home/Calendar/Watch가 같은 캐시를 나눠 쓴다(중복 fetch 제거).
+export function useUpcomingEarnings() {
+  return useQuery({ queryKey: ["earnings", "upcoming"], queryFn: api.upcomingEarnings });
+}
+
+export function useIpos() {
+  return useQuery({ queryKey: ["ipos"], queryFn: api.ipos });
+}
+
+export function useMarketNews() {
+  return useQuery({ queryKey: ["news", "market"], queryFn: () => api.news() });
+}
+
 const POLL_MS = 30_000;
 
 /** 종목 시세 쿼리. 해당 시장 정규장 중에만 30초 주기로 자동 갱신(장 마감/백그라운드면 멈춤). */

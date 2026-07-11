@@ -1,9 +1,8 @@
 import { adaptive } from "@toss/tds-colors";
 import { Tab, Text, Top } from "@toss/tds-mobile";
 import { useMemo, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { api } from "../api/client";
 import { formatDateKo, WEEKDAYS } from "../lib/format";
+import { useIpos, useUpcomingEarnings } from "../lib/hooks";
 import { queryStatus } from "../lib/queryClient";
 import type { UseWatchlist } from "../lib/watchlist";
 import { PlainButton, SectionCard, Screen } from "../components/layout";
@@ -53,16 +52,21 @@ export function CalendarScreen({
   const [monthAnchor, setMonthAnchor] = useState(() => new Date(today.getFullYear(), today.getMonth(), 1));
   const market = MARKET_BY_INDEX[filterIndex];
 
-  const calendar = useQuery({
-    queryKey: ["calendar"],
-    queryFn: async (): Promise<CalendarData> => {
-      const [earnings, ipos] = await Promise.all([api.upcomingEarnings(), api.ipos()]);
-      return { earnings, ipos };
-    },
+  // Home/Watch와 같은 쿼리 키 → 캐시 공유(탭 이동 시 재요청 없음).
+  const earningsQ = useUpcomingEarnings();
+  const iposQ = useIpos();
+  const status = queryStatus({
+    isPending: earningsQ.isPending || iposQ.isPending,
+    isError: earningsQ.isError || iposQ.isError,
   });
-  const status = queryStatus(calendar);
-  const data = calendar.data;
-  const retry = () => void calendar.refetch();
+  const data: CalendarData = {
+    earnings: earningsQ.data ?? [],
+    ipos: iposQ.data ?? [],
+  };
+  const retry = () => {
+    void earningsQ.refetch();
+    void iposQ.refetch();
+  };
 
   const weekDays = useMemo(
     () =>
@@ -91,14 +95,14 @@ export function CalendarScreen({
 
   const marketMatch = <T extends { market: Market }>(x: T) => (market === "all" ? true : x.market === market);
 
-  const dayEarnings = (data?.earnings ?? []).filter((e) => e.date === selectedKey && marketMatch(e));
-  const dayIpos = (data?.ipos ?? []).filter((i) => i.date === selectedKey && marketMatch(i));
+  const dayEarnings = data.earnings.filter((e) => e.date === selectedKey && marketMatch(e));
+  const dayIpos = data.ipos.filter((i) => i.date === selectedKey && marketMatch(i));
   const hasAny = dayEarnings.length + dayIpos.length > 0;
 
   const eventKeys = useMemo(() => {
     const set = new Set<string>();
-    (data?.earnings ?? []).forEach((e) => marketMatch(e) && set.add(e.date));
-    (data?.ipos ?? []).forEach((i) => marketMatch(i) && set.add(i.date));
+    data.earnings.forEach((e) => marketMatch(e) && set.add(e.date));
+    data.ipos.forEach((i) => marketMatch(i) && set.add(i.date));
     return set;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [data, market]);
@@ -140,7 +144,14 @@ export function CalendarScreen({
       </div>
 
       <SectionCard style={{ padding: "12px 8px" }}>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0 8px 8px" }}>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            padding: "0 8px 8px",
+          }}
+        >
           <PlainButton onClick={() => shift(-1)} style={{ padding: "4px 12px" }} aria-label="이전">
             <Text typography="t5" color={adaptive.grey600}>
               ‹

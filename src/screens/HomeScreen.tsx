@@ -1,46 +1,23 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
 import { adaptive } from "@toss/tds-colors";
 import { Text, Top } from "@toss/tds-mobile";
-import { api } from "../api/client";
 import { daysUntil } from "../lib/dday";
 import { openExternal } from "../lib/external";
 import { WEEKDAYS } from "../lib/format";
+import { useIpos, useMarketNews, useUpcomingEarnings } from "../lib/hooks";
 import { type AsyncStatus, queryStatus } from "../lib/queryClient";
 import { type UseWatchlist, withNextEarnings } from "../lib/watchlist";
 import { DisclaimerFooter } from "../components/DisclaimerFooter";
 import { SettingsButton } from "../components/SettingsSheet";
 import { SectionCard, SectionHeader, Screen } from "../components/layout";
-import { EarningsRow, IpoRow, NewsRow } from "../components/rows";
-import { AsyncSection, EmptyState, ListSkeleton } from "../components/states";
-import type { EarningsEvent, IpoEvent, Market, NewsItem } from "../types";
-
-interface HomeData {
-  upcoming: EarningsEvent[];
-  ipos: IpoEvent[];
-  news: NewsItem[];
-  earningsThisWeek: number;
-  iposThisWeek: number;
-  allUpcoming: EarningsEvent[]; // 관심종목의 다음 실적을 파생하는 원본(미래 실적 전체)
-}
+import { EarningsRow, IpoRow, NewsRow, WatchRow } from "../components/rows";
+import { AsyncSection, EmptyState, InlineError, ListSkeleton } from "../components/states";
+import type { IpoEvent, Market } from "../types";
 
 const withinWeek = (date: string, today: Date) => {
   const d = daysUntil(date, today);
   return d >= 0 && d <= 7;
 };
-
-async function loadHome(): Promise<HomeData> {
-  const [upcoming, ipos, news] = await Promise.all([api.upcomingEarnings(), api.ipos(), api.news()]);
-  const today = new Date();
-  return {
-    upcoming: upcoming.slice(0, 5),
-    ipos, // 국내/해외 탭에서 각각 임박 순으로 뽑으므로 전체를 넘긴다
-    news: news.slice(0, 5),
-    earningsThisWeek: upcoming.filter((e) => withinWeek(e.date, today)).length,
-    iposThisWeek: ipos.filter((i) => withinWeek(i.date, today)).length,
-    allUpcoming: upcoming,
-  };
-}
 
 /** 상단 히어로. 브랜드 블루로 화면 시선의 앵커를 만들고 이번 주 요약을 제시한다. */
 function HomeHero({ earnings, ipos }: { earnings: number; ipos: number }) {
@@ -135,12 +112,18 @@ export function HomeScreen({
   onGoWatch: () => void;
   onGoCalendar: () => void;
 }) {
-  const home = useQuery({ queryKey: ["home"], queryFn: loadHome });
-  const status = queryStatus(home);
-  const data = home.data;
-  const retry = () => void home.refetch();
+  // Calendar/Watch와 같은 쿼리 키를 써서 캐시를 공유한다(탭 이동 시 재요청 없음).
+  const upcoming = useUpcomingEarnings();
+  const ipos = useIpos();
+  const news = useMarketNews();
 
-  const watched = withNextEarnings(watchlist.items, data?.allUpcoming ?? []);
+  const today = new Date();
+  const upcomingList = upcoming.data ?? [];
+  const ipoList = ipos.data ?? [];
+  const earningsThisWeek = upcomingList.filter((e) => withinWeek(e.date, today)).length;
+  const iposThisWeek = ipoList.filter((i) => withinWeek(i.date, today)).length;
+
+  const watched = withNextEarnings(watchlist.items, upcomingList);
 
   return (
     <Screen>
@@ -152,11 +135,11 @@ export function HomeScreen({
         </div>
       </div>
 
-      <HomeHero earnings={data?.earningsThisWeek ?? 0} ipos={data?.iposThisWeek ?? 0} />
+      <HomeHero earnings={earningsThisWeek} ipos={iposThisWeek} />
 
       <SectionCard>
         <SectionHeader title="내 관심종목" moreLabel="관심 관리" onMore={onGoWatch} />
-        {!watchlist.loaded || status === "loading" ? (
+        {!watchlist.loaded || upcoming.isPending ? (
           <ListSkeleton rows={2} />
         ) : watched.length === 0 ? (
           <EmptyState
@@ -166,26 +149,38 @@ export function HomeScreen({
             onAction={onGoWatch}
           />
         ) : (
-          watched.map(({ item, next }) =>
-            next ? (
-              <EarningsRow
-                key={item.symbol}
-                event={{ ...next, name: item.name }}
-                watched
-                onToggle={() => watchlist.toggle(item)}
-                onClick={() => onOpenStock(item.symbol)}
-              />
-            ) : null,
-          )
+          <>
+            {upcoming.isError && (
+              <InlineError message="실적 일정을 불러오지 못했어요" onRetry={() => void upcoming.refetch()} />
+            )}
+            {watched.map(({ item, next }) =>
+              next ? (
+                <EarningsRow
+                  key={item.symbol}
+                  event={{ ...next, name: item.name }}
+                  watched
+                  onToggle={() => watchlist.toggle(item)}
+                  onClick={() => onOpenStock(item.symbol)}
+                />
+              ) : (
+                <WatchRow
+                  key={item.symbol}
+                  item={item}
+                  onClick={() => onOpenStock(item.symbol)}
+                  onRemove={() => watchlist.remove(item.symbol)}
+                />
+              ),
+            )}
+          </>
         )}
       </SectionCard>
 
       <SectionCard>
         <SectionHeader title="실적발표 임박" moreLabel="더 보기" onMore={onGoCalendar} />
         <AsyncSection
-          status={status}
-          data={data?.upcoming ?? []}
-          onRetry={retry}
+          status={queryStatus(upcoming)}
+          data={upcomingList.slice(0, 5)}
+          onRetry={() => void upcoming.refetch()}
           empty={<EmptyState title="예정된 실적발표가 없어요" />}
         >
           {(list) =>
@@ -202,14 +197,14 @@ export function HomeScreen({
         </AsyncSection>
       </SectionCard>
 
-      <IpoSection status={status} ipos={data?.ipos ?? []} onRetry={retry} onMore={onGoCalendar} />
+      <IpoSection status={queryStatus(ipos)} ipos={ipoList} onRetry={() => void ipos.refetch()} onMore={onGoCalendar} />
 
       <SectionCard>
         <SectionHeader title="주요 뉴스" />
         <AsyncSection
-          status={status}
-          data={data?.news ?? []}
-          onRetry={retry}
+          status={queryStatus(news)}
+          data={(news.data ?? []).slice(0, 5)}
+          onRetry={() => void news.refetch()}
           empty={<EmptyState title="표시할 뉴스가 없어요" />}
         >
           {(list) => list.map((n) => <NewsRow key={n.url} news={n} onClick={() => openExternal(n.url)} />)}

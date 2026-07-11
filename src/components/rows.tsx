@@ -1,9 +1,10 @@
 import { adaptive } from "@toss/tds-colors";
 import { ListRow, Text } from "@toss/tds-mobile";
 import type { ReactNode } from "react";
+import { ddayLabel } from "../lib/dday";
 import { earningsTimeLabel, marketFlag, relativeTime } from "../lib/format";
 import { logoCandidates } from "../lib/logo";
-import type { EarningsEvent, IpoEvent, NewsItem } from "../types";
+import type { EarningsEvent, IpoEvent, NewsItem, WatchItem } from "../types";
 import { DdayBadge, EstimatedBadge } from "./badges";
 import { StarIcon } from "./icons";
 import { PlainButton } from "./layout";
@@ -82,6 +83,39 @@ export function EarningsRow({
         <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
           <DdayBadge date={event.date} />
           {onToggle != null && <StarToggle on={watched ?? false} onClick={onToggle} />}
+        </div>
+      }
+    />
+  );
+}
+
+/** 관심종목 행: 다음 실적이 있으면 D-day, 없어도 종목은 항상 보여준다(홈·관심 공용). */
+export function WatchRow({
+  item,
+  next,
+  onClick,
+  onRemove,
+}: {
+  item: WatchItem;
+  next?: EarningsEvent;
+  onClick: () => void;
+  onRemove: () => void;
+}) {
+  return (
+    <ListRow
+      onClick={onClick}
+      withTouchEffect
+      left={<StockAvatar name={item.name} seed={item.symbol} logoUrls={logoCandidates(item.symbol, item.market)} />}
+      contents={
+        <TwoLine
+          title={item.name}
+          sub={`${marketFlag(item.market)} ${next ? `다음 실적 ${ddayLabel(next.date)}` : "예정 일정 없음"}`}
+        />
+      }
+      right={
+        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          {next && <DdayBadge date={next.date} />}
+          <StarToggle on onClick={onRemove} />
         </div>
       }
     />

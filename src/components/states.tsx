@@ -75,6 +75,22 @@ export function ErrorState({ onRetry }: { onRetry?: () => void }) {
   );
 }
 
+/** 한 줄짜리 에러 안내(섹션 전체를 대체하지 않는 부분 실패용) */
+export function InlineError({ message, onRetry }: { message: string; onRetry?: () => void }) {
+  return (
+    <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, padding: "10px 24px" }}>
+      <Text typography="t7" color={adaptive.grey500}>
+        {message}
+      </Text>
+      {onRetry != null && (
+        <Button size="small" variant="weak" onClick={onRetry}>
+          다시 시도
+        </Button>
+      )}
+    </div>
+  );
+}
+
 /** 리스트 로딩 스켈레톤 */
 export function ListSkeleton({ rows = 4 }: { rows?: number }) {
   return (
