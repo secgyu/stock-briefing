@@ -34,6 +34,17 @@ describe("parseKindIpos", () => {
     expect(out[1]).toMatchObject({ date: "2026-07-13", isEstimated: true });
   });
 
+  it("상세 필드(청약기간·공모가·공모금액·주선인)를 채운다", () => {
+    expect(out[0]).toMatchObject({
+      subscription: "2026-06-18 ~ 2026-06-19",
+      price: "12,000원",
+      amount: "840억원", // 84,000백만원
+      underwriter: "KB증권(주)",
+    });
+    // 확정가 없는 종목은 price 미포함
+    expect(out[1].price).toBeUndefined();
+  });
+
   it("마크업이 바뀌어 셀 수가 다르면 빈 배열(안전 실패)", () => {
     expect(parseKindIpos("<tr><td>뭔가</td></tr>")).toEqual([]);
   });

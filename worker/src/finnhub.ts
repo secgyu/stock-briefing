@@ -166,6 +166,8 @@ interface FinnhubIpo {
   name: string;
   exchange?: string;
   status?: string;
+  price?: string; // "9.50-11.50" 밴드 또는 단일가, 미정이면 빈 값
+  totalSharesValue?: number; // 총 공모금액(USD)
 }
 
 /**
@@ -243,6 +245,13 @@ export async function fetchUsProfile(symbol: string, env: Env): Promise<UsProfil
   return { currency: p.currency || "USD", marketCap: p.marketCapitalization };
 }
 
+/** 공모금액(USD) → "1.2억 달러" / "850만 달러" */
+function usdAmount(v?: number): string | undefined {
+  if (!v || v <= 0) return undefined;
+  if (v >= 1e8) return `${(v / 1e8).toFixed(1)}억 달러`;
+  return `${Math.round(v / 1e4).toLocaleString("ko-KR")}만 달러`;
+}
+
 /** 다가오는 미국 IPO. */
 export async function fetchUsIpos(env: Env): Promise<IpoEvent[]> {
   const { from, to } = window(31);
@@ -255,5 +264,8 @@ export async function fetchUsIpos(env: Env): Promise<IpoEvent[]> {
       market: "US" as const,
       date: i.date,
       isEstimated: i.status !== "priced",
+      price: i.price ? `$${i.price}` : undefined,
+      amount: usdAmount(i.totalSharesValue),
+      exchange: i.exchange || undefined,
     }));
 }

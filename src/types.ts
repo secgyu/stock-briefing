@@ -18,6 +18,12 @@ export interface IpoEvent {
   market: Market;
   date: string; // 상장(예정)일
   isEstimated: boolean;
+  // 상세 바텀시트용 표시 문자열(소스에 있는 것만 채움). KR=KIND, US=Finnhub.
+  subscription?: string; // 청약기간 (KR)
+  price?: string; // 확정공모가(KR) / 공모가 밴드(US)
+  amount?: string; // 공모금액
+  underwriter?: string; // 상장주선인 (KR)
+  exchange?: string; // 거래소 (US)
 }
 
 export interface NewsItem {

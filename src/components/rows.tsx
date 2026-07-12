@@ -1,8 +1,8 @@
 import { adaptive } from "@toss/tds-colors";
-import { ListRow, Text } from "@toss/tds-mobile";
+import { ListRow, Text, useBottomSheet } from "@toss/tds-mobile";
 import type { ReactNode } from "react";
 import { ddayLabel } from "../lib/dday";
-import { earningsTimeLabel, marketFlag, relativeTime } from "../lib/format";
+import { earningsTimeLabel, formatDateKo, marketFlag, marketLabel, relativeTime } from "../lib/format";
 import { logoCandidates } from "../lib/logo";
 import type { EarningsEvent, IpoEvent, NewsItem, WatchItem } from "../types";
 import { DdayBadge, EstimatedBadge } from "./badges";
@@ -122,9 +122,43 @@ export function WatchRow({
   );
 }
 
+/** IPO 상세 바텀시트 본문: 값이 있는 항목만 라벨-값으로 나열. */
+function IpoDetail({ ipo }: { ipo: IpoEvent }) {
+  const rows: Array<[string, string | undefined]> = [
+    ["시장", `${marketFlag(ipo.market)} ${marketLabel(ipo.market)}${ipo.exchange ? ` · ${ipo.exchange}` : ""}`],
+    ["상장예정일", `${formatDateKo(ipo.date)}${ipo.isEstimated ? " (예정)" : ""}`],
+    ["청약기간", ipo.subscription],
+    ["공모가", ipo.price ?? (ipo.isEstimated ? "미확정" : undefined)],
+    ["공모금액", ipo.amount],
+    ["상장주선인", ipo.underwriter],
+  ];
+  return (
+    <div style={{ padding: "0 8px 16px" }}>
+      {rows
+        .filter((r): r is [string, string] => r[1] != null)
+        .map(([label, value]) => (
+          <div
+            key={label}
+            style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 0" }}
+          >
+            <Text typography="t6" color={adaptive.grey600}>
+              {label}
+            </Text>
+            <Text typography="t6" fontWeight="medium" color={adaptive.grey900}>
+              {value}
+            </Text>
+          </div>
+        ))}
+    </div>
+  );
+}
+
 export function IpoRow({ ipo }: { ipo: IpoEvent }) {
+  const { open, close } = useBottomSheet();
   return (
     <ListRow
+      onClick={() => open({ header: ipo.name, children: <IpoDetail ipo={ipo} />, onClose: () => close() })}
+      withTouchEffect
       left={
         <StockAvatar name={ipo.name} seed={ipo.symbol ?? ipo.name} logoUrls={logoCandidates(ipo.symbol, ipo.market)} />
       }

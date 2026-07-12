@@ -5,6 +5,17 @@ import type { IpoEvent } from "../../src/types";
 // 업그레이드 경로는 유료 API 또는 마크업 재적응. 행 구조는 kind.test.ts 픽스처로 고정해 둔다.
 const KIND_URL = "https://kind.krx.co.kr/listinvstg/pubofrprogcom.do";
 
+/** "84,000"(백만원) → "840억원". 숫자가 아니면 undefined. */
+function toEokwon(millionWon: string): string | undefined {
+  const n = Number(millionWon.replace(/,/g, ""));
+  if (!Number.isFinite(n) || n <= 0) return undefined;
+  return `${Math.round(n / 100).toLocaleString("ko-KR")}억원`;
+}
+
+/** "2026-06-18  ~ 2026-06-19" 같은 셀을 한 칸 공백으로 정리. 날짜가 없으면 undefined. */
+const period = (cell: string): string | undefined =>
+  /\d{4}-\d{2}-\d{2}/.test(cell) ? cell.replace(/\s+/g, " ").trim() : undefined;
+
 /**
  * 공모기업현황 HTML에서 IPO 목록 추출.
  * 각 행: <tr onclick="fnDetailView('..')"> + td 9개(회사명, 신고서제출일, 수요예측, 청약, 납입일,
@@ -20,12 +31,17 @@ export function parseKindIpos(html: string): IpoEvent[] {
     if (!name || cells.length !== 9) continue;
     const date = /^\d{4}-\d{2}-\d{2}/.exec(cells[7])?.[0];
     if (!date) continue; // 상장예정일 미정 행은 제외
+    const priced = /\d/.test(cells[5]);
     out.push({
       name,
       market: "KR",
       date,
       // 확정공모가가 비어 있으면 아직 수요예측 전 → 일정이 밀릴 수 있어 "예상" 표기
-      isEstimated: !/\d/.test(cells[5]),
+      isEstimated: !priced,
+      subscription: period(cells[3]),
+      price: priced ? `${cells[5]}원` : undefined,
+      amount: toEokwon(cells[6]),
+      underwriter: cells[8] || undefined,
     });
   }
   return out;

@@ -118,7 +118,7 @@ async function usEarnings(env: WorkerEnv): Promise<EarningsEvent[]> {
 
 async function usIpos(env: WorkerEnv): Promise<IpoEvent[]> {
   try {
-    return await cached(env, "us-ipos", IPO_TTL, () => fetchUsIpos(env));
+    return await cached(env, "us-ipos:v2", IPO_TTL, () => fetchUsIpos(env));
   } catch {
     return [];
   }
@@ -127,7 +127,7 @@ async function usIpos(env: WorkerEnv): Promise<IpoEvent[]> {
 /** 국내 공모주(KIND 스크래핑). 실패 시 빈 배열. */
 async function krIpos(env: WorkerEnv): Promise<IpoEvent[]> {
   try {
-    return await cached(env, "kr-ipos:v1", IPO_TTL, fetchKrIpos);
+    return await cached(env, "kr-ipos:v2", IPO_TTL, fetchKrIpos);
   } catch {
     return [];
   }
