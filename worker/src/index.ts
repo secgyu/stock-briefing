@@ -14,6 +14,7 @@ import { fetchNaverNews, type NaverEnv } from "./naver";
 import { type DartEnv, fetchKrDisclosures, KR_CORP } from "./dart";
 import { fetchKrQuote, type KrxEnv } from "./krx";
 import { fetchKrEarnings, fetchKrQuoteYahoo, type YahooEnv } from "./yahoo";
+import { fetchKrIpos } from "./kind";
 
 // 검색·상세용 종목 마스터: KR mock + KR_CORP(공시·실적 유니버스 20, 전부 코스피) + 미국 유니버스(88).
 // 중복 심볼은 mock 우선. KR_CORP 미병합 시 셀트리온 등 14종이 캘린더엔 뜨는데 검색·상세가 안 됐다.
@@ -30,7 +31,7 @@ export const SYMBOL_MASTER: SymbolInfo[] = [
 ];
 
 // 실데이터 소스: 미국 실적/IPO/시세=Finnhub, 국내 실적=Yahoo(비공식), 국내 시세=금융위 종가,
-// 뉴스=네이버, 공시=DART. 국내 IPO/섹터는 무료 실소스가 없어 미노출.
+// 국내 IPO=KIND(스크래핑), 뉴스=네이버, 공시=DART. 국내 섹터는 무료 실소스가 없어 미노출.
 
 interface WorkerEnv extends Env, NaverEnv, DartEnv, KrxEnv, YahooEnv {
   CACHE: KVNamespace;
@@ -118,6 +119,15 @@ async function usEarnings(env: WorkerEnv): Promise<EarningsEvent[]> {
 async function usIpos(env: WorkerEnv): Promise<IpoEvent[]> {
   try {
     return await cached(env, "us-ipos", IPO_TTL, () => fetchUsIpos(env));
+  } catch {
+    return [];
+  }
+}
+
+/** 국내 공모주(KIND 스크래핑). 실패 시 빈 배열. */
+async function krIpos(env: WorkerEnv): Promise<IpoEvent[]> {
+  try {
+    return await cached(env, "kr-ipos:v1", IPO_TTL, fetchKrIpos);
   } catch {
     return [];
   }
@@ -263,9 +273,11 @@ export default {
         }
       }
 
-      // 미국(Finnhub 실데이터)만. 국내 IPO는 무료 실소스가 없어 미노출.
-      case "/ipo":
-        return json(upcoming(await usIpos(env)).slice(0, 50));
+      // 미국=Finnhub, 국내=KIND(공모기업현황 스크래핑). 병합해 임박순.
+      case "/ipo": {
+        const [us, kr] = await Promise.all([usIpos(env), krIpos(env)]);
+        return json(upcoming([...us, ...kr]).slice(0, 50));
+      }
 
       // 종목 뉴스(?symbol=) 없으면 시장 뉴스. 네이버 검색 API, 실패 시 빈 배열.
       case "/news": {

@@ -83,8 +83,7 @@ function IpoSection({
   onRetry: () => void;
   onMore: () => void;
 }) {
-  // 국내 IPO는 무료 실데이터 소스가 없어 항상 비므로, 기본 탭은 데이터가 있는 해외로.
-  const [tab, setTab] = useState<Market>("US");
+  const [tab, setTab] = useState<Market>("KR");
   const list = ipos.filter((i) => i.market === tab).slice(0, 5);
   return (
     <SectionCard>
@@ -94,9 +93,7 @@ function IpoSection({
         status={status}
         data={list}
         onRetry={onRetry}
-        empty={
-          <EmptyState title={tab === "KR" ? "국내 상장 일정은 아직 제공하지 않아요" : "예정된 상장 일정이 없어요"} />
-        }
+        empty={<EmptyState title="예정된 상장 일정이 없어요" />}
       >
         {(rows) => rows.map((i) => <IpoRow key={`${i.name}-${i.date}`} ipo={i} />)}
       </AsyncSection>
