@@ -12,3 +12,8 @@ export function logoCandidates(symbol?: string, market?: Market): string[] {
   if (market === "KR") return [`${BASE}/${symbol}.KS?format=png`, `${BASE}/${symbol}.KQ?format=png`];
   return [];
 }
+
+// ponytail: 언론사 아이콘은 구글 파비콘 서비스. 없는 도메인이면 지구본 기본 아이콘이 오는데(404가 아님)
+// 그 정도면 모노그램보다 낫다. 업그레이드 경로: 언론사별 로고 매핑.
+export const faviconUrl = (domain: string): string =>
+  `https://www.google.com/s2/favicons?domain=${encodeURIComponent(domain)}&sz=64`;

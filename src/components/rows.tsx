@@ -3,7 +3,7 @@ import { ListRow, Text, useBottomSheet } from "@toss/tds-mobile";
 import type { ReactNode } from "react";
 import { ddayLabel } from "../lib/dday";
 import { earningsTimeLabel, formatDateKo, marketFlag, marketLabel, relativeTime } from "../lib/format";
-import { logoCandidates } from "../lib/logo";
+import { faviconUrl, logoCandidates } from "../lib/logo";
 import type { EarningsEvent, IpoEvent, NewsItem, WatchItem } from "../types";
 import { DdayBadge, EstimatedBadge } from "./badges";
 import { StarIcon } from "./icons";
@@ -184,7 +184,7 @@ export function NewsRow({ news, onClick }: { news: NewsItem; onClick: () => void
       onClick={onClick}
       withTouchEffect
       arrowType="right"
-      left={<StockAvatar name={news.source} seed={news.source} size={40} />}
+      left={<StockAvatar name={news.source} seed={news.source} size={40} logoUrls={[faviconUrl(news.source)]} />}
       contents={
         <div>
           <Text typography="t6" fontWeight="medium" color={adaptive.grey900} ellipsisAfterLines={2}>
